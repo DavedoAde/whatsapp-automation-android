@@ -1,5 +1,9 @@
 package com.example.whatsappautomation
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -12,9 +16,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import com.example.whatsappautomation.data.AutomationRule
 import com.example.whatsappautomation.data.Contact
 
@@ -23,6 +29,19 @@ fun DashboardScreen(viewModel: AppViewModel, onNavigateToSimulator: () -> Unit) 
     val isAutomationActive by viewModel.isAutomationActive.collectAsState()
     val activeRulesCount by viewModel.activeRulesCount.collectAsState()
     val totalContactsCount by viewModel.totalContactsCount.collectAsState()
+    
+    val context = LocalContext.current
+    var hasContactPermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_CONTACTS) == PackageManager.PERMISSION_GRANTED
+        )
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        hasContactPermission = isGranted
+    }
 
     Column(
         modifier = Modifier.fillMaxSize().padding(16.dp),
@@ -66,6 +85,26 @@ fun DashboardScreen(viewModel: AppViewModel, onNavigateToSimulator: () -> Unit) 
             }
         }
 
+        // Permission Card
+        if (!hasContactPermission) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("Permission Required", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onErrorContainer)
+                    Text("Grant contact access to automatically save new leads to your phone's address book.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onErrorContainer)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(
+                        onClick = { permissionLauncher.launch(Manifest.permission.WRITE_CONTACTS) },
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                    ) {
+                        Text("Grant Permission")
+                    }
+                }
+            }
+        }
+
         Spacer(modifier = Modifier.height(16.dp))
 
         Button(onClick = onNavigateToSimulator, modifier = Modifier.fillMaxWidth()) {
@@ -73,6 +112,9 @@ fun DashboardScreen(viewModel: AppViewModel, onNavigateToSimulator: () -> Unit) 
         }
     }
 }
+
+// ... The rest of the file (ContactsScreen, RulesScreen, RuleDialog, etc.) remains exactly the same ...
+// (I am including them below so you can safely copy/paste the whole file)
 
 @Composable
 fun ContactsScreen(viewModel: AppViewModel) {
@@ -261,7 +303,6 @@ fun RuleDialog(existingRule: AutomationRule?, onDismiss: () -> Unit, onSave: (St
                     singleLine = true
                 )
                 
-                // Action Type Selector
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     RadioButton(
                         selected = actionType == "AUTO_REPLY",
