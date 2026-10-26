@@ -52,60 +52,59 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // --- SIMULATION & TASKER LOGIC STATE ---
+    // --- SIMULATION STATE ---
     private var currentSimulatedMenuId: Long? = null
-    private var currentSenderId = "+1234567890" // Fake number for testing
+    private var currentSenderId = "+1234567890" 
     
-    // This boolean acts like the Tasker trigger. If true, the next message is a name!
     private var isAwaitingContactName = false 
+    private var awaitingRule: AutomationRule? = null // Store the rule so we can use its thank you message
 
     fun simulateMessage(message: String): String {
         
-        // 1. THE TASKER LOGIC: If we are waiting for a name, capture it immediately!
+        // 1. If we are waiting for a name
         if (isAwaitingContactName) {
             val extractedName = RuleEngine.extractName(message)
             
             viewModelScope.launch {
-                // Save to App Database
                 val newContact = Contact(phoneNumber = currentSenderId, name = extractedName, sourceApp = "WhatsApp")
                 contactDao.insertContact(newContact)
                 
-                // Save to Phone's Actual Address Book
                 val context = getApplication<Application>()
                 if (ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_CONTACTS) == PackageManager.PERMISSION_GRANTED) {
                     PhoneContactManager.saveContactToPhone(context, extractedName, currentSenderId)
                 }
             }
             
-            isAwaitingContactName = false // Reset the Tasker state
-            return "Thank you, $extractedName! Your details have been saved." // This bypasses the YES/NO confirmation entirely
+            isAwaitingContactName = false 
+            val thankYou = awaitingRule?.thankYouReply ?: "Thank you, {name}!"
+            awaitingRule = null
+            return thankYou.replace("{name}", extractedName)
         }
 
         val allRulesList = allRules.value
 
-        // 2. SUBMENU ROUTING: If we are currently inside a submenu, ONLY check child rules of that menu
+        // 2. Submenu Routing
         if (currentSimulatedMenuId != null) {
             val childRules = allRulesList.filter { it.parentRuleId == currentSimulatedMenuId && it.isActive }
             val matchedChild = RuleEngine.findMatchingRule(message, childRules)
 
             if (matchedChild != null) {
-                // Check if this child has its own children (nested menus)
                 val hasSubMenu = allRulesList.any { it.parentRuleId == matchedChild.id }
                 currentSimulatedMenuId = if (hasSubMenu) matchedChild.id else null
                 
-                if (matchedChild.actionType == "CAPTURE_CONTACT") {
+                if (matchedChild.askForName) {
                     isAwaitingContactName = true
+                    awaitingRule = matchedChild
                 }
-                return RuleEngine.getReplyText(matchedChild)
+                return RuleEngine.getReplyText(matchedChild, number = currentSenderId)
             } else {
-                // User typed something invalid. Stay in the menu and remind them.
                 val parentMenu = allRulesList.find { it.id == currentSimulatedMenuId }
-                val parentText = if (parentMenu != null) RuleEngine.getReplyText(parentMenu) else ""
+                val parentText = if (parentMenu != null) RuleEngine.getReplyText(parentMenu, number = currentSenderId) else ""
                 return "Invalid option. Please choose from the menu:\n\n$parentText"
             }
         }
 
-        // 3. STANDARD TOP-LEVEL MATCHING
+        // 3. Standard Top-Level
         val topLevelRules = allRulesList.filter { it.parentRuleId == null }
         val matchedRule = RuleEngine.findMatchingRule(message, topLevelRules)
         
@@ -113,10 +112,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             val hasSubMenu = allRulesList.any { it.parentRuleId == matchedRule.id }
             currentSimulatedMenuId = if (hasSubMenu) matchedRule.id else null
 
-            if (matchedRule.actionType == "CAPTURE_CONTACT") {
+            if (matchedRule.askForName) {
                 isAwaitingContactName = true
+                awaitingRule = matchedRule
+                return matchedRule.promptQuestion // Return the prompt immediately
             }
-            RuleEngine.getReplyText(matchedRule)
+            RuleEngine.getReplyText(matchedRule, number = currentSenderId)
         } else {
             "No rule matched. (No reply sent)"
         }
