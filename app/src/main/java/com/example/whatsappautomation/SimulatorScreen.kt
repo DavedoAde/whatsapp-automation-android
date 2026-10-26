@@ -7,13 +7,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -25,16 +25,13 @@ fun SimulatorScreen(viewModel: AppViewModel, onBack: () -> Unit) {
     var inputMessage by remember { mutableStateOf("") }
     val messages = remember { mutableStateListOf<ChatMessage>() }
     val listState = rememberLazyListState()
-    val coroutineScope = rememberCoroutineScope()
 
-    // Add a default welcome message from the "bot"
     LaunchedEffect(Unit) {
         if (messages.isEmpty()) {
             messages.add(ChatMessage("Simulator ready. Type a message below to test your rules.", false))
         }
     }
 
-    // Auto-scroll to bottom when a new message is added
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
             listState.animateScrollToItem(messages.size - 1)
@@ -47,7 +44,12 @@ fun SimulatorScreen(viewModel: AppViewModel, onBack: () -> Unit) {
                 title = { Text("Chat Simulator") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Text("< Back", fontSize = 16.sp, color = MaterialTheme.colorScheme.primary)
+                        // Fixed: Used a proper Material arrow icon
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack, 
+                            contentDescription = "Back",
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
@@ -60,7 +62,6 @@ fun SimulatorScreen(viewModel: AppViewModel, onBack: () -> Unit) {
                 .padding(padding)
                 .background(MaterialTheme.colorScheme.background)
         ) {
-            // Chat List
             LazyColumn(
                 state = listState,
                 modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 8.dp),
@@ -72,7 +73,6 @@ fun SimulatorScreen(viewModel: AppViewModel, onBack: () -> Unit) {
                 }
             }
 
-            // Input Area
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -93,13 +93,12 @@ fun SimulatorScreen(viewModel: AppViewModel, onBack: () -> Unit) {
                     onClick = {
                         if (inputMessage.isNotBlank()) {
                             val userText = inputMessage
-                            messages.add(ChatMessage(userText, true)) // Add user message
+                            messages.add(ChatMessage(userText, true))
                             inputMessage = ""
 
-                            // Process rule
                             val matchedRule = viewModel.simulateMessage(userText)
                             if (matchedRule != null) {
-                                messages.add(ChatMessage(matchedRule.replyMessage, false)) // Add bot reply
+                                messages.add(ChatMessage(matchedRule.replyMessage, false))
                             } else {
                                 messages.add(ChatMessage("No rule matched. (No reply sent)", false))
                             }
