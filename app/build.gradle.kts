@@ -30,6 +30,11 @@ android {
     buildFeatures {
         compose = true
     }
+    // This tells the build system to use a compiler version
+    // that is compatible with your Kotlin 1.9.24.
+    composeOptions {
+        kotlinCompilerExtensionVersion = "1.5.14"
+    }
 }
 
 dependencies {
@@ -38,6 +43,6 @@ dependencies {
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.ui:ui-tooling-preview")
-    implementation("androidx.appcompat:appcompat:1.7.0") // Added for the theme
+    implementation("androidx.appcompat:appcompat:1.7.0")
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
