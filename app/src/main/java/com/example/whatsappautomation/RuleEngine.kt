@@ -7,25 +7,103 @@ object RuleEngine {
     fun findMatchingRule(message: String, rules: List<AutomationRule>): AutomationRule? {
         if (message.isBlank()) return null
 
+        // Sort by priority (lower number = higher priority)
         val activeRules = rules.filter { it.isActive }.sortedBy { it.priority }
 
         for (rule in activeRules) {
             val isMatch = when (rule.matchType) {
-                "EXACT" -> message.trim().equals(rule.triggerKeyword.trim(), ignoreCase = true)
+                "EXACT" -> normalizeText(message) == normalizeText(rule.triggerKeyword)
+                "SIMILARITY" -> calculateSimilarity(message, rule.triggerKeyword) >= 0.75
+                "PATTERN" -> checkWildcardPattern(message, rule.triggerKeyword)
                 "REGEX" -> {
                     try {
                         Regex(rule.triggerKeyword, RegexOption.IGNORE_CASE).containsMatchIn(message)
                     } catch (e: Exception) {
-                        false // Invalid regex, ignore
+                        false
                     }
                 }
-                else -> message.contains(rule.triggerKeyword, ignoreCase = true) // SIMILARITY / CONTAINS
+                else -> message.contains(rule.triggerKeyword, ignoreCase = true)
             }
 
-            if (isMatch) {
-                return rule
-            }
+            if (isMatch) return rule
         }
         return null
+    }
+
+    // 1. EXACT MATCH (Ignores case, punctuation, and extra spaces)
+    private fun normalizeText(text: String): String {
+        return text.lowercase()
+            .replace(Regex("[^a-z0-9\\s]"), "") 
+            .replace(Regex("\\s+"), " ") 
+            .trim()
+    }
+
+    // 2. SIMILARITY MATCH (Levenshtein Distance / Typo tolerance)
+    private fun calculateSimilarity(s1: String, s2: String): Double {
+        val longer = if (s1.length > s2.length) s1 else s2
+        val shorter = if (s1.length > s2.length) s2 else s1
+        
+        if (longer.isEmpty()) return 1.0
+        val distance = levenshteinDistance(longer.lowercase(), shorter.lowercase())
+        return (longer.length - distance).toDouble() / longer.length.toDouble()
+    }
+
+    private fun levenshteinDistance(lhs: String, rhs: String): Int {
+        val lhsLength = lhs.length + 1
+        val rhsLength = rhs.length + 1
+        val cost = Array(lhsLength) { IntArray(rhsLength) }
+
+        for (i in 0 until lhsLength) cost[i][0] = i
+        for (j in 0 until rhsLength) cost[0][j] = j
+
+        for (i in 1 until lhsLength) {
+            for (j in 1 until rhsLength) {
+                cost[i][j] = minOf(
+                    cost[i - 1][j] + 1,
+                    cost[i][j - 1] + 1,
+                    cost[i - 1][j - 1] + if (lhs[i - 1] == rhs[j - 1]) 0 else 1
+                )
+            }
+        }
+        return cost[lhsLength - 1][rhsLength - 1]
+    }
+
+    // 3. PATTERN MATCH (Wildcards: * for anything, // for OR)
+    private fun checkWildcardPattern(message: String, pattern: String): Boolean {
+        val regexPattern = pattern
+            .replace("//", "|")
+            .replace("*", ".*")
+        return try {
+            Regex(regexPattern, RegexOption.IGNORE_CASE).containsMatchIn(message)
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    // 4. GET REPLY (Handles Single, All, Random)
+    fun getReplyText(rule: AutomationRule): String {
+        val replies = rule.replyMessage.split("|").filter { it.isNotBlank() }
+        if (replies.isEmpty()) return ""
+
+        return when (rule.replyMode) {
+            "ALL" -> replies.joinToString("\n\n")
+            "RANDOM" -> replies.random()
+            else -> replies.first()
+        }
+    }
+
+    // 5. TASKER LOGIC: Smart Name Extractor
+    fun extractName(input: String): String {
+        val lower = input.trim().lowercase()
+        val prefixes = listOf("my name is ", "i am ", "im ", "call me ", "it's ", "its ")
+        var name = input.trim()
+        
+        for (prefix in prefixes) {
+            if (lower.startsWith(prefix)) {
+                name = name.substring(prefix.length).trim()
+                break
+            }
+        }
+        return name.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
     }
 }
