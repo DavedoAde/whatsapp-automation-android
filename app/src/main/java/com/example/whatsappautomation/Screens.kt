@@ -3,6 +3,8 @@ package com.example.whatsappautomation
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -11,6 +13,10 @@ import androidx.compose.ui.text.font.FontWeight
 
 @Composable
 fun DashboardScreen(viewModel: AppViewModel) {
+    val isAutomationActive by viewModel.isAutomationActive.collectAsState()
+    val activeRulesCount by viewModel.activeRulesCount.collectAsState()
+    val totalContactsCount by viewModel.totalContactsCount.collectAsState()
+
     Column(
         modifier = Modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -24,10 +30,17 @@ fun DashboardScreen(viewModel: AppViewModel) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column {
-                    Text("Automation is ON", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text(
+                        text = if (isAutomationActive) "Automation is ON" else "Automation is OFF", 
+                        fontWeight = FontWeight.Bold, 
+                        color = if (isAutomationActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                    )
                     Text("Monitoring WhatsApp", fontSize = 12.sp)
                 }
-                Switch(checked = viewModel.isAutomationActive, onCheckedChange = { /* Toggle later */ })
+                Switch(
+                    checked = isAutomationActive, 
+                    onCheckedChange = { viewModel.toggleAutomation(it) }
+                )
             }
         }
 
@@ -35,15 +48,25 @@ fun DashboardScreen(viewModel: AppViewModel) {
             Card(modifier = Modifier.weight(1f)) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text("Active Rules", fontSize = 12.sp)
-                    Text("${viewModel.activeRulesCount}", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                    Text("$activeRulesCount", fontSize = 24.sp, fontWeight = FontWeight.Bold)
                 }
             }
             Card(modifier = Modifier.weight(1f)) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text("Contacts", fontSize = 12.sp)
-                    Text("${viewModel.totalContactsCount}", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                    Text("$totalContactsCount", fontSize = 24.sp, fontWeight = FontWeight.Bold)
                 }
             }
+        }
+
+        Spacer(modifier = Modifier.weight(1f))
+
+        // Temporary button to prove the database works
+        Button(
+            onClick = { viewModel.addMockData() },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Test Database (Add Mock Data)")
         }
     }
 }
