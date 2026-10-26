@@ -5,7 +5,7 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-@Database(entities = [Contact::class, AutomationRule::class], version = 2, exportSchema = false)
+@Database(entities = [Contact::class, AutomationRule::class], version = 3, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun contactDao(): ContactDao
     abstract fun ruleDao(): RuleDao
@@ -21,7 +21,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "whatsapp_automation_database"
                 )
-                .fallbackToDestructiveMigration() // Drops old tables if schema changes (good for development)
+                .fallbackToDestructiveMigration()
                 .build()
                 INSTANCE = instance
                 instance
