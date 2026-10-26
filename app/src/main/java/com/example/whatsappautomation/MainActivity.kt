@@ -10,10 +10,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -79,9 +81,35 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
                 DashboardScreen(viewModel, onNavigateToSimulator = { navController.navigate("simulator") }) 
             }
             composable(Screen.Contacts.route) { ContactsScreen(viewModel) }
-            composable(Screen.Rules.route) { RulesScreen(viewModel) }
+            
+            // Updated Rules route to pass the rule ID (0 for new rule)
+            composable(Screen.Rules.route) { 
+                RulesScreen(
+                    viewModel = viewModel,
+                    onEditRule = { ruleId -> navController.navigate("rule_editor/$ruleId") }
+                ) 
+            }
+            
             composable("simulator") { 
                 SimulatorScreen(viewModel, onBack = { navController.popBackStack() }) 
+            }
+
+            composable(
+                route = "rule_editor/{ruleId}",
+                arguments = listOf(navArgument("ruleId") { type = NavType.LongType })
+            ) { backStackEntry ->
+                val ruleId = backStackEntry.arguments?.getLong("ruleId") ?: 0L
+                // Find the rule if editing, otherwise null
+                val existingRule = if (ruleId == 0L) null else viewModel.allRules.value.find { it.id == ruleId }
+                
+                RuleEditorScreen(
+                    existingRule = existingRule,
+                    onBack = { navController.popBackStack() },
+                    onSave = { updatedRule ->
+                        viewModel.saveRule(updatedRule)
+                        navController.popBackStack()
+                    }
+                )
             }
         }
     }
