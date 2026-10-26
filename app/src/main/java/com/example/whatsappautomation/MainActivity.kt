@@ -68,7 +68,7 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
         ) {
             composable(Screen.Dashboard.route) { DashboardScreen(viewModel) }
             composable(Screen.Contacts.route) { ContactsScreen() }
-            composable(Screen.Rules.route) { RulesScreen() }
+            composable(Screen.Rules.route) { RulesScreen(viewModel) }
         }
     }
 }
