@@ -9,15 +9,12 @@ enum class CaptureState {
 data class ConversationResponse(
     val reply: String,
     val nextState: CaptureState,
-    val tempName: String? = null, // Holds the name while waiting for YES/NO
-    val saveContact: Boolean = false // Tells the ViewModel to save to DB
+    val tempName: String? = null,
+    val saveContact: Boolean = false
 )
 
 object ConversationManager {
     
-    // The trigger phrase that starts the flow
-    private const val TRIGGER_PHRASE = "join the free class"
-
     fun processMessage(
         message: String, 
         currentState: CaptureState, 
@@ -28,25 +25,16 @@ object ConversationManager {
 
         return when (currentState) {
             CaptureState.IDLE -> {
-                // Check if the message contains the trigger phrase
-                if (lowerMsg.contains(TRIGGER_PHRASE)) {
-                    ConversationResponse(
-                        reply = "Welcome! What should I call you?",
-                        nextState = CaptureState.AWAITING_NAME
-                    )
-                } else {
-                    // Return an empty reply to signify no conversation flow triggered
-                    ConversationResponse(reply = "", nextState = CaptureState.IDLE)
-                }
+                // If we are idle, we don't handle messages here anymore. The ViewModel handles it.
+                ConversationResponse(reply = "", nextState = CaptureState.IDLE)
             }
 
             CaptureState.AWAITING_NAME -> {
-                // Capitalize the first letter of their name for a nice touch
-                val formattedName = message.trim().replaceFirstChar { it.uppercase() }
+                val cleanName = extractName(message)
                 ConversationResponse(
-                    reply = "Nice to meet you, $formattedName. Is that your correct name? Reply YES to confirm or NO to change it.",
+                    reply = "Nice to meet you, $cleanName. Is that your correct name? Reply YES to confirm or NO to change it.",
                     nextState = CaptureState.AWAITING_CONFIRMATION,
-                    tempName = formattedName
+                    tempName = cleanName
                 )
             }
 
@@ -55,7 +43,8 @@ object ConversationManager {
                     ConversationResponse(
                         reply = "Thank you, ${currentTempName}! Your details have been saved.",
                         nextState = CaptureState.IDLE,
-                        saveContact = true
+                        saveContact = true,
+                        tempName = currentTempName // FIXED: Pass the name back so it saves
                     )
                 } else if (lowerMsg == "no" || lowerMsg == "n") {
                     ConversationResponse(
@@ -72,5 +61,21 @@ object ConversationManager {
                 }
             }
         }
+    }
+
+    // Smart name extractor (removes "My name is", "I am", etc.)
+    private fun extractName(input: String): String {
+        val lower = input.trim().lowercase()
+        val prefixes = listOf("my name is ", "i am ", "im ", "call me ", "it's ", "its ")
+        var name = input.trim()
+        
+        for (prefix in prefixes) {
+            if (lower.startsWith(prefix)) {
+                name = name.substring(prefix.length).trim()
+                break
+            }
+        }
+        // Capitalize first letter
+        return name.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
     }
 }
