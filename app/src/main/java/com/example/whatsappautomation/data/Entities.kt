@@ -23,21 +23,23 @@ data class AutomationRule(
     val isActive: Boolean = true,
     val priority: Int = 1,
     
-    // Advanced Match Types: EXACT, SIMILARITY, PATTERN, REGEX
-    val matchType: String = "SIMILARITY", 
+    // Card 1: Received Message
+    val matchType: String = "SIMILARITY", // EXACT, SIMILARITY, PATTERN, REGEX, WELCOME
+    val targetChat: String = "ALL", // ALL, INDIVIDUALS, GROUPS, SPECIFIC
     
-    // Action Type: AUTO_REPLY, CAPTURE_CONTACT
-    val actionType: String = "AUTO_REPLY", 
+    // Card 3: Multiple replies
+    val replyMode: String = "SINGLE", // SINGLE (1), ALL, RANDOM
     
-    // Reply Mode: SINGLE, ALL, RANDOM
-    val replyMode: String = "SINGLE", 
+    // Card 4: Save Lead
+    val askForName: Boolean = false,
+    val promptQuestion: String = "What's your name?",
+    val thankYouReply: String = "Nice to meet you, {name}!",
     
-    val delaySeconds: Int = 0,
-    val recipientType: String = "BOTH", 
+    // Card 5: Conditions
     val requireScreenOff: Boolean = false,
     val requireCharging: Boolean = false,
     val requireDnd: Boolean = false,
     
-    // Links a submenu to its parent rule
+    // Submenus
     val parentRuleId: Long? = null 
 )
