@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.whatsappautomation.data.AppDatabase
+import com.example.whatsappautomation.data.AutomationRule
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -31,23 +32,21 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val totalContactsCount = contactDao.getContactCount()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
-    // Function to add dummy data for testing
-    fun addMockData() {
+    // Get all rules for the Rules Screen
+    val allRules = ruleDao.getAllRules()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // Add a new rule
+    fun addRule(name: String, keyword: String, reply: String) {
         viewModelScope.launch {
-            contactDao.insertContact(
-                com.example.whatsappautomation.data.Contact(
-                    phoneNumber = "+1234567890",
-                    name = "Test Contact",
-                    sourceApp = "WhatsApp"
-                )
+            val newRule = AutomationRule(
+                name = name,
+                triggerKeyword = keyword,
+                replyMessage = reply,
+                isActive = true,
+                priority = 1 // Default priority
             )
-            ruleDao.insertRule(
-                com.example.whatsappautomation.data.AutomationRule(
-                    name = "Test Rule",
-                    triggerKeyword = "Hello",
-                    replyMessage = "Hi there!"
-                )
-            )
+            ruleDao.insertRule(newRule)
         }
     }
 }
