@@ -40,25 +40,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val allRules = ruleDao.getAllRules()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // Updated addRule to include defaults for new fields
-    fun addRule(name: String, keyword: String, reply: String, actionType: String, matchType: String) {
+    // Unified save function for creating or updating
+    fun saveRule(rule: AutomationRule) {
         viewModelScope.launch {
-            val newRule = AutomationRule(
-                name = name,
-                triggerKeyword = keyword,
-                replyMessage = reply,
-                isActive = true,
-                priority = 1,
-                actionType = actionType,
-                matchType = matchType
-            )
-            ruleDao.insertRule(newRule)
-        }
-    }
-
-    fun updateRule(updatedRule: AutomationRule) {
-        viewModelScope.launch {
-            ruleDao.insertRule(updatedRule) 
+            ruleDao.insertRule(rule)
         }
     }
 
