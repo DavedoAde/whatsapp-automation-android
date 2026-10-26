@@ -37,6 +37,7 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
     
+    // Hide top and bottom bars on secondary screens (Simulator, Rule Editor)
     val isMainScreen = currentRoute in listOf(Screen.Dashboard.route, Screen.Contacts.route, Screen.Rules.route)
 
     Scaffold(
@@ -44,10 +45,7 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
             if (isMainScreen) {
                 TopAppBar(
                     title = { Text("WhatsApp Automation", color = MaterialTheme.colorScheme.primary) },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surface,
-                        titleContentColor = MaterialTheme.colorScheme.primary
-                    )
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
                 )
             }
         },
@@ -82,11 +80,10 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
             }
             composable(Screen.Contacts.route) { ContactsScreen(viewModel) }
             
-            // Updated Rules route to pass the rule ID (0 for new rule)
             composable(Screen.Rules.route) { 
                 RulesScreen(
                     viewModel = viewModel,
-                    onEditRule = { ruleId -> navController.navigate("rule_editor/$ruleId") }
+                    onEditRule = { ruleId -> navController.navigate("rule_editor/$ruleId/0") }
                 ) 
             }
             
@@ -94,20 +91,34 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
                 SimulatorScreen(viewModel, onBack = { navController.popBackStack() }) 
             }
 
+            // Route handles both top-level rules (parentId = 0) and submenu rules (parentId != 0)
             composable(
-                route = "rule_editor/{ruleId}",
-                arguments = listOf(navArgument("ruleId") { type = NavType.LongType })
+                route = "rule_editor/{ruleId}/{parentId}",
+                arguments = listOf(
+                    navArgument("ruleId") { type = NavType.LongType },
+                    navArgument("parentId") { type = NavType.LongType }
+                )
             ) { backStackEntry ->
                 val ruleId = backStackEntry.arguments?.getLong("ruleId") ?: 0L
-                // Find the rule if editing, otherwise null
+                val parentId = backStackEntry.arguments?.getLong("parentId") ?: 0L
+                
                 val existingRule = if (ruleId == 0L) null else viewModel.allRules.value.find { it.id == ruleId }
+                val childRules = viewModel.allRules.value.filter { it.parentRuleId == ruleId }
                 
                 RuleEditorScreen(
                     existingRule = existingRule,
+                    parentId = if (parentId == 0L) null else parentId,
+                    childRules = childRules,
                     onBack = { navController.popBackStack() },
                     onSave = { updatedRule ->
                         viewModel.saveRule(updatedRule)
                         navController.popBackStack()
+                    },
+                    onAddChildRule = { parentRuleId ->
+                        navController.navigate("rule_editor/0/$parentRuleId")
+                    },
+                    onEditChildRule = { childId ->
+                        navController.navigate("rule_editor/$childId/0") 
                     }
                 )
             }
@@ -121,7 +132,6 @@ fun WhatsAppAutomationTheme(content: @Composable () -> Unit) {
     val charcoal = Color(0xFF1E2A3A)
     val accentGreen = Color(0xFF4CAF50)
     val textLight = Color(0xFFE0E0E0)
-    val bubbleGreen = Color(0xFF005C4B)
 
     MaterialTheme(
         colorScheme = darkColorScheme(
@@ -129,8 +139,7 @@ fun WhatsAppAutomationTheme(content: @Composable () -> Unit) {
             background = darkNavy,
             surface = charcoal,
             onBackground = textLight,
-            onSurface = textLight,
-            tertiary = bubbleGreen
+            onSurface = textLight
         ),
         content = content
     )
