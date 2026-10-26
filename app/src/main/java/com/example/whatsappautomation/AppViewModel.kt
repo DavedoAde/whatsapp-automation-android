@@ -46,7 +46,18 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // New function to simulate incoming messages
+    fun updateRule(updatedRule: AutomationRule) {
+        viewModelScope.launch {
+            ruleDao.insertRule(updatedRule) // Room's REPLACE strategy handles the update
+        }
+    }
+
+    fun deleteRule(rule: AutomationRule) {
+        viewModelScope.launch {
+            ruleDao.deleteRuleById(rule.id)
+        }
+    }
+
     fun simulateMessage(message: String): AutomationRule? {
         val currentRules = allRules.value
         return RuleEngine.findMatchingRule(message, currentRules)
