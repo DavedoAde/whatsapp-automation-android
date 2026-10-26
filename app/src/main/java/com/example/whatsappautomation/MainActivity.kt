@@ -31,35 +31,42 @@ class MainActivity : ComponentActivity() {
 fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
     val navController = rememberNavController()
     val screens = listOf(Screen.Dashboard, Screen.Contacts, Screen.Rules)
+    
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry?.destination?.route
+    
+    // Check if we are on one of the main tabs. If not, hide the top and bottom bars.
+    val isMainScreen = currentRoute in listOf(Screen.Dashboard.route, Screen.Contacts.route, Screen.Rules.route)
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("WhatsApp Automation", color = MaterialTheme.colorScheme.primary) },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    titleContentColor = MaterialTheme.colorScheme.primary
+            if (isMainScreen) {
+                TopAppBar(
+                    title = { Text("WhatsApp Automation", color = MaterialTheme.colorScheme.primary) },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        titleContentColor = MaterialTheme.colorScheme.primary
+                    )
                 )
-            )
+            }
         },
         bottomBar = {
-            NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
-                val navBackStackEntry by navController.currentBackStackEntryAsState()
-                val currentRoute = navBackStackEntry?.destination?.route
-
-                screens.forEach { screen ->
-                    NavigationBarItem(
-                        icon = { Icon(screen.icon, contentDescription = screen.title) },
-                        label = { Text(screen.title) },
-                        selected = currentRoute == screen.route,
-                        onClick = {
-                            navController.navigate(screen.route) {
-                                popUpTo(navController.graph.startDestinationId) { saveState = true }
-                                launchSingleTop = true
-                                restoreState = true
+            if (isMainScreen) {
+                NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
+                    screens.forEach { screen ->
+                        NavigationBarItem(
+                            icon = { Icon(screen.icon, contentDescription = screen.title) },
+                            label = { Text(screen.title) },
+                            selected = currentRoute == screen.route,
+                            onClick = {
+                                navController.navigate(screen.route) {
+                                    popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                    launchSingleTop = true
+                                    restoreState = true
+                                }
                             }
-                        }
-                    )
+                        )
+                    }
                 }
             }
         }
@@ -87,7 +94,7 @@ fun WhatsAppAutomationTheme(content: @Composable () -> Unit) {
     val charcoal = Color(0xFF1E2A3A)
     val accentGreen = Color(0xFF4CAF50)
     val textLight = Color(0xFFE0E0E0)
-    val bubbleGreen = Color(0xFF005C4B) // WhatsApp dark mode green
+    val bubbleGreen = Color(0xFF005C4B)
 
     MaterialTheme(
         colorScheme = darkColorScheme(
