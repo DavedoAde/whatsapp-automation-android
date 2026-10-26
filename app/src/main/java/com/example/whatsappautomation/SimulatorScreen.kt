@@ -11,7 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material3.*
-import androidx.compose.material3.OutlinedTextFieldDefaults // <--- ADDED THIS IMPORT
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -76,7 +76,7 @@ fun SimulatorScreen(viewModel: AppViewModel, onBack: () -> Unit) {
                     .fillMaxWidth()
                     .background(Color(0xFF1F2C34))
                     .padding(8.dp)
-                    .imePadding(),
+                    .imePadding(), // This keeps the input box above the keyboard
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 OutlinedTextField(
