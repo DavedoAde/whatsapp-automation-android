@@ -40,7 +40,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val allRules = ruleDao.getAllRules()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    fun addRule(name: String, keyword: String, reply: String, actionType: String) {
+    // Updated addRule to include defaults for new fields
+    fun addRule(name: String, keyword: String, reply: String, actionType: String, matchType: String) {
         viewModelScope.launch {
             val newRule = AutomationRule(
                 name = name,
@@ -48,7 +49,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 replyMessage = reply,
                 isActive = true,
                 priority = 1,
-                actionType = actionType
+                actionType = actionType,
+                matchType = matchType
             )
             ruleDao.insertRule(newRule)
         }
@@ -79,7 +81,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
             if (flowResponse.saveContact && currentTempName != null) {
                 viewModelScope.launch {
-                    // 1. Save to App Database
                     val newContact = Contact(
                         phoneNumber = currentSenderId,
                         name = currentTempName!!,
@@ -87,7 +88,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     )
                     contactDao.insertContact(newContact)
                     
-                    // 2. Save to Phone Contacts (if permission granted)
                     val context = getApplication<Application>()
                     if (ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_CONTACTS) == PackageManager.PERMISSION_GRANTED) {
                         PhoneContactManager.saveContactToPhone(context, currentTempName!!, currentSenderId)
