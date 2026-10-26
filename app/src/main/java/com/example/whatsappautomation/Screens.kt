@@ -85,7 +85,6 @@ fun DashboardScreen(viewModel: AppViewModel, onNavigateToSimulator: () -> Unit) 
             }
         }
 
-        // Permission Card
         if (!hasContactPermission) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -112,9 +111,6 @@ fun DashboardScreen(viewModel: AppViewModel, onNavigateToSimulator: () -> Unit) 
         }
     }
 }
-
-// ... The rest of the file (ContactsScreen, RulesScreen, RuleDialog, etc.) remains exactly the same ...
-// (I am including them below so you can safely copy/paste the whole file)
 
 @Composable
 fun ContactsScreen(viewModel: AppViewModel) {
@@ -170,10 +166,8 @@ fun ContactCard(contact: Contact) {
 }
 
 @Composable
-fun RulesScreen(viewModel: AppViewModel) {
+fun RulesScreen(viewModel: AppViewModel, onEditRule: (Long) -> Unit) {
     val rules by viewModel.allRules.collectAsState()
-    var showDialog by remember { mutableStateOf(false) }
-    var ruleToEdit by remember { mutableStateOf<AutomationRule?>(null) }
     var ruleToDelete by remember { mutableStateOf<AutomationRule?>(null) }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -191,10 +185,7 @@ fun RulesScreen(viewModel: AppViewModel) {
                 items(rules) { rule ->
                     RuleCard(
                         rule = rule,
-                        onEditClick = { 
-                            ruleToEdit = rule
-                            showDialog = true 
-                        },
+                        onEditClick = { onEditRule(rule.id) },
                         onDeleteClick = { ruleToDelete = rule }
                     )
                 }
@@ -202,30 +193,12 @@ fun RulesScreen(viewModel: AppViewModel) {
         }
 
         FloatingActionButton(
-            onClick = { 
-                ruleToEdit = null
-                showDialog = true 
-            },
+            onClick = { onEditRule(0L) }, // 0L means new rule
             modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
             containerColor = MaterialTheme.colorScheme.primary
         ) {
             Icon(Icons.Default.Add, contentDescription = "Add Rule")
         }
-    }
-
-    if (showDialog) {
-        RuleDialog(
-            existingRule = ruleToEdit,
-            onDismiss = { showDialog = false },
-            onSave = { name, keyword, reply, actionType ->
-                if (ruleToEdit == null) {
-                    viewModel.addRule(name, keyword, reply, actionType)
-                } else {
-                    viewModel.updateRule(ruleToEdit!!.copy(name = name, triggerKeyword = keyword, replyMessage = reply, actionType = actionType))
-                }
-                showDialog = false
-            }
-        )
     }
 
     if (ruleToDelete != null) {
@@ -262,9 +235,9 @@ fun RuleCard(rule: AutomationRule, onEditClick: () -> Unit, onDeleteClick: () ->
             Column(modifier = Modifier.weight(1f)) {
                 Text(rule.name, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.primary)
                 Text("Type: ${if (rule.actionType == "CAPTURE_CONTACT") "Capture Contact" else "Auto Reply"}", fontSize = 12.sp, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f))
+                Text("Match: ${rule.matchType}", fontSize = 12.sp, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f))
                 Spacer(modifier = Modifier.height(4.dp))
                 Text("Trigger: '${rule.triggerKeyword}'", fontSize = 14.sp)
-                Text("Reply: '${rule.replyMessage}'", fontSize = 14.sp, maxLines = 1)
             }
             Row {
                 IconButton(onClick = onEditClick) {
@@ -276,65 +249,4 @@ fun RuleCard(rule: AutomationRule, onEditClick: () -> Unit, onDeleteClick: () ->
             }
         }
     }
-}
-
-@Composable
-fun RuleDialog(existingRule: AutomationRule?, onDismiss: () -> Unit, onSave: (String, String, String, String) -> Unit) {
-    var name by remember { mutableStateOf(existingRule?.name ?: "") }
-    var keyword by remember { mutableStateOf(existingRule?.triggerKeyword ?: "") }
-    var reply by remember { mutableStateOf(existingRule?.replyMessage ?: "") }
-    var actionType by remember { mutableStateOf(existingRule?.actionType ?: "AUTO_REPLY") }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(if (existingRule == null) "Create New Rule" else "Edit Rule") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("Rule Name") },
-                    singleLine = true
-                )
-                OutlinedTextField(
-                    value = keyword,
-                    onValueChange = { keyword = it },
-                    label = { Text("Trigger Keyword") },
-                    singleLine = true
-                )
-                
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    RadioButton(
-                        selected = actionType == "AUTO_REPLY",
-                        onClick = { actionType = "AUTO_REPLY" }
-                    )
-                    Text("Auto Reply")
-                    Spacer(modifier = Modifier.width(8.dp))
-                    RadioButton(
-                        selected = actionType == "CAPTURE_CONTACT",
-                        onClick = { actionType = "CAPTURE_CONTACT" }
-                    )
-                    Text("Capture Contact")
-                }
-
-                OutlinedTextField(
-                    value = reply,
-                    onValueChange = { reply = it },
-                    label = { Text(if (actionType == "CAPTURE_CONTACT") "Welcome Message (e.g., What is your name?)" else "Reply Message") },
-                    minLines = 2
-                )
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = { if (name.isNotBlank() && keyword.isNotBlank() && reply.isNotBlank()) onSave(name, keyword, reply, actionType) },
-                enabled = name.isNotBlank() && keyword.isNotBlank() && reply.isNotBlank()
-            ) {
-                Text("Save")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
-        }
-    )
 }
