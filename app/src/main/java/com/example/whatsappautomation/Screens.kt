@@ -105,7 +105,6 @@ fun ContactCard(contact: Contact) {
             modifier = Modifier.padding(16.dp).fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Avatar Placeholder
             Surface(
                 shape = MaterialTheme.shapes.medium,
                 color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
@@ -176,11 +175,11 @@ fun RulesScreen(viewModel: AppViewModel) {
         RuleDialog(
             existingRule = ruleToEdit,
             onDismiss = { showDialog = false },
-            onSave = { name, keyword, reply ->
+            onSave = { name, keyword, reply, actionType ->
                 if (ruleToEdit == null) {
-                    viewModel.addRule(name, keyword, reply)
+                    viewModel.addRule(name, keyword, reply, actionType)
                 } else {
-                    viewModel.updateRule(ruleToEdit!!.copy(name = name, triggerKeyword = keyword, replyMessage = reply))
+                    viewModel.updateRule(ruleToEdit!!.copy(name = name, triggerKeyword = keyword, replyMessage = reply, actionType = actionType))
                 }
                 showDialog = false
             }
@@ -220,6 +219,7 @@ fun RuleCard(rule: AutomationRule, onEditClick: () -> Unit, onDeleteClick: () ->
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(rule.name, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.primary)
+                Text("Type: ${if (rule.actionType == "CAPTURE_CONTACT") "Capture Contact" else "Auto Reply"}", fontSize = 12.sp, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f))
                 Spacer(modifier = Modifier.height(4.dp))
                 Text("Trigger: '${rule.triggerKeyword}'", fontSize = 14.sp)
                 Text("Reply: '${rule.replyMessage}'", fontSize = 14.sp, maxLines = 1)
@@ -237,10 +237,11 @@ fun RuleCard(rule: AutomationRule, onEditClick: () -> Unit, onDeleteClick: () ->
 }
 
 @Composable
-fun RuleDialog(existingRule: AutomationRule?, onDismiss: () -> Unit, onSave: (String, String, String) -> Unit) {
+fun RuleDialog(existingRule: AutomationRule?, onDismiss: () -> Unit, onSave: (String, String, String, String) -> Unit) {
     var name by remember { mutableStateOf(existingRule?.name ?: "") }
     var keyword by remember { mutableStateOf(existingRule?.triggerKeyword ?: "") }
     var reply by remember { mutableStateOf(existingRule?.replyMessage ?: "") }
+    var actionType by remember { mutableStateOf(existingRule?.actionType ?: "AUTO_REPLY") }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -250,26 +251,42 @@ fun RuleDialog(existingRule: AutomationRule?, onDismiss: () -> Unit, onSave: (St
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text("Rule Name (e.g., Welcome)") },
+                    label = { Text("Rule Name") },
                     singleLine = true
                 )
                 OutlinedTextField(
                     value = keyword,
                     onValueChange = { keyword = it },
-                    label = { Text("Trigger Keyword (e.g., Hi)") },
+                    label = { Text("Trigger Keyword") },
                     singleLine = true
                 )
+                
+                // Action Type Selector
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(
+                        selected = actionType == "AUTO_REPLY",
+                        onClick = { actionType = "AUTO_REPLY" }
+                    )
+                    Text("Auto Reply")
+                    Spacer(modifier = Modifier.width(8.dp))
+                    RadioButton(
+                        selected = actionType == "CAPTURE_CONTACT",
+                        onClick = { actionType = "CAPTURE_CONTACT" }
+                    )
+                    Text("Capture Contact")
+                }
+
                 OutlinedTextField(
                     value = reply,
                     onValueChange = { reply = it },
-                    label = { Text("Reply Message") },
+                    label = { Text(if (actionType == "CAPTURE_CONTACT") "Welcome Message (e.g., What is your name?)" else "Reply Message") },
                     minLines = 2
                 )
             }
         },
         confirmButton = {
             Button(
-                onClick = { if (name.isNotBlank() && keyword.isNotBlank() && reply.isNotBlank()) onSave(name, keyword, reply) },
+                onClick = { if (name.isNotBlank() && keyword.isNotBlank() && reply.isNotBlank()) onSave(name, keyword, reply, actionType) },
                 enabled = name.isNotBlank() && keyword.isNotBlank() && reply.isNotBlank()
             ) {
                 Text("Save")
