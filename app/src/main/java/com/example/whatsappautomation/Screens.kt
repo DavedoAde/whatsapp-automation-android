@@ -168,7 +168,6 @@ fun ContactCard(contact: Contact) {
 @Composable
 fun RulesScreen(viewModel: AppViewModel, onEditRule: (Long) -> Unit) {
     val allRules by viewModel.allRules.collectAsState()
-    // Only show top-level rules in the main list
     val topLevelRules = allRules.filter { it.parentRuleId == null }
     
     var ruleToDelete by remember { mutableStateOf<AutomationRule?>(null) }
@@ -237,7 +236,14 @@ fun RuleCard(rule: AutomationRule, onEditClick: () -> Unit, onDeleteClick: () ->
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(rule.name, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.primary)
-                Text("Type: ${if (rule.actionType == "CAPTURE_CONTACT") "Capture Contact" else "Auto Reply"}", fontSize = 12.sp, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f))
+                
+                // FIXED: Changed rule.actionType to rule.askForName
+                Text(
+                    text = if (rule.askForName) "Save Lead: ON" else "Standard Reply", 
+                    fontSize = 12.sp, 
+                    color = if (rule.askForName) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+                )
+                
                 Text("Match: ${rule.matchType}", fontSize = 12.sp, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f))
                 Spacer(modifier = Modifier.height(4.dp))
                 Text("Trigger: '${rule.triggerKeyword}'", fontSize = 14.sp)
