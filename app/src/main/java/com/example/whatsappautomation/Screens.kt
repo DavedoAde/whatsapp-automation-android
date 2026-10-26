@@ -15,7 +15,7 @@ import androidx.compose.ui.unit.sp
 import com.example.whatsappautomation.data.AutomationRule
 
 @Composable
-fun DashboardScreen(viewModel: AppViewModel) {
+fun DashboardScreen(viewModel: AppViewModel, onNavigateToSimulator: () -> Unit) {
     val isAutomationActive by viewModel.isAutomationActive.collectAsState()
     val activeRulesCount by viewModel.activeRulesCount.collectAsState()
     val totalContactsCount by viewModel.totalContactsCount.collectAsState()
@@ -60,6 +60,15 @@ fun DashboardScreen(viewModel: AppViewModel) {
                     Text("$totalContactsCount", fontSize = 24.sp, fontWeight = FontWeight.Bold)
                 }
             }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Button(
+            onClick = onNavigateToSimulator,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Open Message Simulator")
         }
     }
 }
