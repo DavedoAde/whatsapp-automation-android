@@ -7,7 +7,6 @@ object RuleEngine {
     fun findMatchingRule(message: String, rules: List<AutomationRule>): AutomationRule? {
         if (message.isBlank()) return null
 
-        // Sort by priority (lower number = higher priority)
         val activeRules = rules.filter { it.isActive }.sortedBy { it.priority }
 
         for (rule in activeRules) {
@@ -22,6 +21,7 @@ object RuleEngine {
                         false
                     }
                 }
+                "WELCOME" -> true // In the simulator, we will trigger this immediately for testing
                 else -> message.contains(rule.triggerKeyword, ignoreCase = true)
             }
 
