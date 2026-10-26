@@ -5,6 +5,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -64,10 +66,7 @@ fun DashboardScreen(viewModel: AppViewModel, onNavigateToSimulator: () -> Unit) 
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        Button(
-            onClick = onNavigateToSimulator,
-            modifier = Modifier.fillMaxWidth()
-        ) {
+        Button(onClick = onNavigateToSimulator, modifier = Modifier.fillMaxWidth()) {
             Text("Open Message Simulator")
         }
     }
@@ -83,7 +82,9 @@ fun ContactsScreen() {
 @Composable
 fun RulesScreen(viewModel: AppViewModel) {
     val rules by viewModel.allRules.collectAsState()
-    var showAddDialog by remember { mutableStateOf(false) }
+    var showDialog by remember { mutableStateOf(false) }
+    var ruleToEdit by remember { mutableStateOf<AutomationRule?>(null) }
+    var ruleToDelete by remember { mutableStateOf<AutomationRule?>(null) }
 
     Box(modifier = Modifier.fillMaxSize()) {
         if (rules.isEmpty()) {
@@ -98,54 +99,103 @@ fun RulesScreen(viewModel: AppViewModel) {
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(rules) { rule ->
-                    RuleCard(rule)
+                    RuleCard(
+                        rule = rule,
+                        onEditClick = { 
+                            ruleToEdit = rule
+                            showDialog = true 
+                        },
+                        onDeleteClick = { ruleToDelete = rule }
+                    )
                 }
             }
         }
 
         FloatingActionButton(
-            onClick = { showAddDialog = true },
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(16.dp),
+            onClick = { 
+                ruleToEdit = null
+                showDialog = true 
+            },
+            modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
             containerColor = MaterialTheme.colorScheme.primary
         ) {
             Icon(Icons.Default.Add, contentDescription = "Add Rule")
         }
     }
 
-    if (showAddDialog) {
-        AddRuleDialog(
-            onDismiss = { showAddDialog = false },
+    if (showDialog) {
+        RuleDialog(
+            existingRule = ruleToEdit,
+            onDismiss = { showDialog = false },
             onSave = { name, keyword, reply ->
-                viewModel.addRule(name, keyword, reply)
-                showAddDialog = false
+                if (ruleToEdit == null) {
+                    viewModel.addRule(name, keyword, reply)
+                } else {
+                    viewModel.updateRule(ruleToEdit!!.copy(name = name, triggerKeyword = keyword, replyMessage = reply))
+                }
+                showDialog = false
+            }
+        )
+    }
+
+    if (ruleToDelete != null) {
+        AlertDialog(
+            onDismissRequest = { ruleToDelete = null },
+            title = { Text("Delete Rule?") },
+            text = { Text("Are you sure you want to delete '${ruleToDelete?.name}'?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.deleteRule(ruleToDelete!!)
+                        ruleToDelete = null
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { ruleToDelete = null }) { Text("Cancel") }
             }
         )
     }
 }
 
 @Composable
-fun RuleCard(rule: AutomationRule) {
+fun RuleCard(rule: AutomationRule, onEditClick: () -> Unit, onDeleteClick: () -> Unit) {
     Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(rule.name, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.primary)
-            Spacer(modifier = Modifier.height(4.dp))
-            Text("If message contains: '${rule.triggerKeyword}'", fontSize = 14.sp)
-            Text("Reply: '${rule.replyMessage}'", fontSize = 14.sp)
+        Row(
+            modifier = Modifier.padding(16.dp).fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(rule.name, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.primary)
+                Spacer(modifier = Modifier.height(4.dp))
+                Text("Trigger: '${rule.triggerKeyword}'", fontSize = 14.sp)
+                Text("Reply: '${rule.replyMessage}'", fontSize = 14.sp, maxLines = 1)
+            }
+            Row {
+                IconButton(onClick = onEditClick) {
+                    Icon(Icons.Default.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.primary)
+                }
+                IconButton(onClick = onDeleteClick) {
+                    Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
+                }
+            }
         }
     }
 }
 
 @Composable
-fun AddRuleDialog(onDismiss: () -> Unit, onSave: (String, String, String) -> Unit) {
-    var name by remember { mutableStateOf("") }
-    var keyword by remember { mutableStateOf("") }
-    var reply by remember { mutableStateOf("") }
+fun RuleDialog(existingRule: AutomationRule?, onDismiss: () -> Unit, onSave: (String, String, String) -> Unit) {
+    var name by remember { mutableStateOf(existingRule?.name ?: "") }
+    var keyword by remember { mutableStateOf(existingRule?.triggerKeyword ?: "") }
+    var reply by remember { mutableStateOf(existingRule?.replyMessage ?: "") }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Create New Rule") },
+        title = { Text(if (existingRule == null) "Create New Rule" else "Edit Rule") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
@@ -177,9 +227,7 @@ fun AddRuleDialog(onDismiss: () -> Unit, onSave: (String, String, String) -> Uni
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
+            TextButton(onClick = onDismiss) { Text("Cancel") }
         }
     )
 }
