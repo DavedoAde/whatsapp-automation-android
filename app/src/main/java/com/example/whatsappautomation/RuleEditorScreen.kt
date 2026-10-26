@@ -7,6 +7,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
@@ -30,6 +31,7 @@ fun RuleEditorScreen(
     onAddChildRule: (Long) -> Unit,
     onEditChildRule: (Long) -> Unit
 ) {
+    // Name is now optional, we will auto-generate it if blank
     var name by rememberSaveable(existingRule?.id) { mutableStateOf(existingRule?.name ?: "") }
     var trigger by rememberSaveable(existingRule?.id) { mutableStateOf(existingRule?.triggerKeyword ?: "") }
     var matchType by rememberSaveable(existingRule?.id) { mutableStateOf(existingRule?.matchType ?: "SIMILARITY") }
@@ -52,6 +54,9 @@ fun RuleEditorScreen(
 
     val scrollState = rememberScrollState()
 
+    // Validation logic: Trigger must not be blank, and at least one reply must not be blank
+    val canSave = trigger.isNotBlank() && replies.any { it.isNotBlank() }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -61,47 +66,51 @@ fun RuleEditorScreen(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
-                actions = {
-                    Button(
-                        onClick = {
-                            val combinedReplies = replies.filter { it.isNotBlank() }.joinToString("|")
-                            
-                            val newRule = existingRule?.copy(
-                                name = name,
-                                triggerKeyword = trigger,
-                                replyMessage = combinedReplies,
-                                matchType = matchType,
-                                actionType = actionType,
-                                replyMode = replyMode,
-                                delaySeconds = delay.toIntOrNull() ?: 0,
-                                recipientType = recipient,
-                                requireScreenOff = screenOff,
-                                requireCharging = charging,
-                                requireDnd = dnd
-                            ) ?: AutomationRule(
-                                name = name,
-                                triggerKeyword = trigger,
-                                replyMessage = combinedReplies,
-                                matchType = matchType,
-                                actionType = actionType,
-                                replyMode = replyMode,
-                                delaySeconds = delay.toIntOrNull() ?: 0,
-                                recipientType = recipient,
-                                requireScreenOff = screenOff,
-                                requireCharging = charging,
-                                requireDnd = dnd,
-                                parentRuleId = parentId
-                            )
-                            onSave(newRule)
-                        },
-                        enabled = name.isNotBlank() && trigger.isNotBlank() && replies.any { it.isNotBlank() },
-                        modifier = Modifier.padding(end = 8.dp)
-                    ) {
-                        Text("Save")
-                    }
-                },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
             )
+        },
+        floatingActionButton = {
+            // The Green Checkmark Save Button
+            if (canSave) {
+                FloatingActionButton(
+                    onClick = {
+                        val combinedReplies = replies.filter { it.isNotBlank() }.joinToString("|")
+                        // If name is blank, auto-generate from trigger
+                        val finalName = if (name.isBlank()) trigger else name
+                        
+                        val newRule = existingRule?.copy(
+                            name = finalName,
+                            triggerKeyword = trigger,
+                            replyMessage = combinedReplies,
+                            matchType = matchType,
+                            actionType = actionType,
+                            replyMode = replyMode,
+                            delaySeconds = delay.toIntOrNull() ?: 0,
+                            recipientType = recipient,
+                            requireScreenOff = screenOff,
+                            requireCharging = charging,
+                            requireDnd = dnd
+                        ) ?: AutomationRule(
+                            name = finalName,
+                            triggerKeyword = trigger,
+                            replyMessage = combinedReplies,
+                            matchType = matchType,
+                            actionType = actionType,
+                            replyMode = replyMode,
+                            delaySeconds = delay.toIntOrNull() ?: 0,
+                            recipientType = recipient,
+                            requireScreenOff = screenOff,
+                            requireCharging = charging,
+                            requireDnd = dnd,
+                            parentRuleId = parentId
+                        )
+                        onSave(newRule)
+                    },
+                    containerColor = MaterialTheme.colorScheme.primary
+                ) {
+                    Icon(Icons.Default.Check, contentDescription = "Save Rule", tint = MaterialTheme.colorScheme.onPrimary)
+                }
+            }
         }
     ) { padding ->
         Column(
@@ -151,6 +160,13 @@ fun RuleEditorScreen(
                         Text("Advanced: use standard Java Regex", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
                     }
                 }
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { matchType = "WELCOME" }) {
+                    RadioButton(selected = matchType == "WELCOME", onClick = { matchType = "WELCOME" })
+                    Column {
+                        Text("Welcome Message", color = MaterialTheme.colorScheme.primary)
+                        Text("Replies to the first message from a NON-CONTACT", fontSize = 10.sp, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f))
+                    }
+                }
             }
 
             // SECTION 2: ACTION & MULTIPLE REPLIES
@@ -178,7 +194,7 @@ fun RuleEditorScreen(
                         RadioButton(selected = replyMode == "ALL", onClick = { replyMode = "ALL" })
                         Text("All")
                     }
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { replyMode == "RANDOM" }) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { replyMode = "RANDOM" }) {
                         RadioButton(selected = replyMode == "RANDOM", onClick = { replyMode = "RANDOM" })
                         Text("Random")
                     }
@@ -275,7 +291,8 @@ fun RuleEditorScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(32.dp))
+            // Extra padding at the bottom so the FAB doesn't hide the last checkbox
+            Spacer(modifier = Modifier.height(80.dp))
         }
     }
 }
