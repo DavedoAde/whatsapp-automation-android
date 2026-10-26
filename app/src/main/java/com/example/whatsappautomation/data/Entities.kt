@@ -21,5 +21,6 @@ data class AutomationRule(
     val triggerKeyword: String,
     val replyMessage: String,
     val isActive: Boolean = true,
-    val priority: Int = 1
+    val priority: Int = 1,
+    val actionType: String = "AUTO_REPLY" // Can be "AUTO_REPLY" or "CAPTURE_CONTACT"
 )
