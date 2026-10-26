@@ -13,6 +13,7 @@ import androidx.compose.ui.text.font.FontWeight
 
 @Composable
 fun DashboardScreen(viewModel: AppViewModel) {
+    // FIX: Using .value to get the raw Boolean out of the StateFlow
     val isAutomationActive by viewModel.isAutomationActive.collectAsState()
     val activeRulesCount by viewModel.activeRulesCount.collectAsState()
     val totalContactsCount by viewModel.totalContactsCount.collectAsState()
