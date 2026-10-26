@@ -1,6 +1,9 @@
 package com.example.whatsappautomation
 
+import android.Manifest
 import android.app.Application
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.whatsappautomation.data.AppDatabase
@@ -63,13 +66,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // --- SIMULATOR & CONVERSATION LOGIC ---
     private var currentCaptureState = CaptureState.IDLE
     private var currentTempName: String? = null
     private var currentSenderId = "+1234567890" 
 
     fun simulateMessage(message: String): String {
-        // 1. If we are already in a conversation flow, process it
         if (currentCaptureState != CaptureState.IDLE) {
             val flowResponse = ConversationManager.processMessage(message, currentCaptureState, currentTempName)
             
@@ -78,28 +79,31 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
             if (flowResponse.saveContact && currentTempName != null) {
                 viewModelScope.launch {
+                    // 1. Save to App Database
                     val newContact = Contact(
                         phoneNumber = currentSenderId,
                         name = currentTempName!!,
                         sourceApp = "WhatsApp"
                     )
                     contactDao.insertContact(newContact)
+                    
+                    // 2. Save to Phone Contacts (if permission granted)
+                    val context = getApplication<Application>()
+                    if (ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_CONTACTS) == PackageManager.PERMISSION_GRANTED) {
+                        PhoneContactManager.saveContactToPhone(context, currentTempName!!, currentSenderId)
+                    }
                 }
             }
             return flowResponse.reply
         }
 
-        // 2. If not in a flow, check the user's rules
         val matchedRule = RuleEngine.findMatchingRule(message, allRules.value)
         
         return if (matchedRule != null) {
             if (matchedRule.actionType == "CAPTURE_CONTACT") {
-                // Trigger the flow!
                 currentCaptureState = CaptureState.AWAITING_NAME
-                // Use the rule's reply as the welcome message, or a default one
                 matchedRule.replyMessage.ifBlank { "Welcome! What should I call you?" }
             } else {
-                // Standard auto-reply
                 matchedRule.replyMessage
             }
         } else {
