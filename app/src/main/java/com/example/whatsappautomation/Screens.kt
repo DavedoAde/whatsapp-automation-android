@@ -7,6 +7,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -15,6 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.whatsappautomation.data.AutomationRule
+import com.example.whatsappautomation.data.Contact
 
 @Composable
 fun DashboardScreen(viewModel: AppViewModel, onNavigateToSimulator: () -> Unit) {
@@ -67,15 +69,62 @@ fun DashboardScreen(viewModel: AppViewModel, onNavigateToSimulator: () -> Unit) 
         Spacer(modifier = Modifier.height(16.dp))
 
         Button(onClick = onNavigateToSimulator, modifier = Modifier.fillMaxWidth()) {
-            Text("Open Message Simulator")
+            Text("Open Chat Simulator")
         }
     }
 }
 
 @Composable
-fun ContactsScreen() {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text("Contacts list will go here", fontSize = 18.sp)
+fun ContactsScreen(viewModel: AppViewModel) {
+    val contacts by viewModel.allContacts.collectAsState()
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        if (contacts.isEmpty()) {
+            Text(
+                "No contacts captured yet.\nUse the Simulator to test the flow.", 
+                modifier = Modifier.align(Alignment.Center),
+                fontSize = 16.sp
+            )
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize().padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(contacts) { contact ->
+                    ContactCard(contact)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ContactCard(contact: Contact) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.padding(16.dp).fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Avatar Placeholder
+            Surface(
+                shape = MaterialTheme.shapes.medium,
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                modifier = Modifier.size(48.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Person,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(8.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(16.dp))
+            Column {
+                Text(contact.name, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.onSurface)
+                Text("Phone: ${contact.phoneNumber}", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
+                Text("Source: ${contact.sourceApp}", fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
+            }
+        }
     }
 }
 
