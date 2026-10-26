@@ -11,7 +11,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable // <--- ADDED THIS IMPORT
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -178,7 +178,7 @@ fun RuleEditorScreen(
                         RadioButton(selected = replyMode == "ALL", onClick = { replyMode = "ALL" })
                         Text("All")
                     }
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { replyMode = "RANDOM" }) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { replyMode == "RANDOM" }) {
                         RadioButton(selected = replyMode == "RANDOM", onClick = { replyMode = "RANDOM" })
                         Text("Random")
                     }
@@ -219,7 +219,7 @@ fun RuleEditorScreen(
             // SECTION 3: SUBMENU
             if (existingRule != null) {
                 EditorSection(title = "Submenu / Conversation Flow") {
-                    Text("Rules added here will only trigger if the contact is currently inside this menu.", fontSize = 12.sp)
+                    Text("Add a new rule inside this menu. You will be taken to a new screen to configure it.", fontSize = 12.sp)
                     Spacer(modifier = Modifier.height(8.dp))
                     
                     if (childRules.isEmpty()) {
