@@ -44,7 +44,6 @@ fun SimulatorScreen(viewModel: AppViewModel, onBack: () -> Unit) {
                 title = { Text("Chat Simulator") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        // Fixed: Used a proper Material arrow icon
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack, 
                             contentDescription = "Back",
@@ -96,12 +95,11 @@ fun SimulatorScreen(viewModel: AppViewModel, onBack: () -> Unit) {
                             messages.add(ChatMessage(userText, true))
                             inputMessage = ""
 
-                            val matchedRule = viewModel.simulateMessage(userText)
-                            if (matchedRule != null) {
-                                messages.add(ChatMessage(matchedRule.replyMessage, false))
-                            } else {
-                                messages.add(ChatMessage("No rule matched. (No reply sent)", false))
-                            }
+                            // FIXED: The ViewModel now returns a plain String (the reply)
+                            val botReplyText = viewModel.simulateMessage(userText)
+                            
+                            // Add the bot's reply directly
+                            messages.add(ChatMessage(botReplyText, false))
                         }
                     },
                     enabled = inputMessage.isNotBlank(),
