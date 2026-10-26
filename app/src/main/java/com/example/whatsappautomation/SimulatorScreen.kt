@@ -10,8 +10,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.Face
 import androidx.compose.material3.*
+import androidx.compose.material3.OutlinedTextFieldDefaults // <--- ADDED THIS IMPORT
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -41,16 +41,14 @@ fun SimulatorScreen(viewModel: AppViewModel, onBack: () -> Unit) {
         }
     }
 
-    // The Scaffold ensures we have a proper structure
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { 
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        // Mock WhatsApp Avatar
                         Surface(
                             shape = CircleShape,
-                            color = Color(0xFF00A884), // WhatsApp green
+                            color = Color(0xFF00A884),
                             modifier = Modifier.size(36.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
@@ -69,17 +67,16 @@ fun SimulatorScreen(viewModel: AppViewModel, onBack: () -> Unit) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF1F2C34)) // WhatsApp Dark Mode Header
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF1F2C34))
             )
         },
         bottomBar = {
-            // This is the input area. 
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color(0xFF1F2C34)) // Match header
+                    .background(Color(0xFF1F2C34))
                     .padding(8.dp)
-                    .imePadding(), // <--- THE MAGIC FIX: Pushes input above keyboard
+                    .imePadding(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 OutlinedTextField(
@@ -117,12 +114,11 @@ fun SimulatorScreen(viewModel: AppViewModel, onBack: () -> Unit) {
             }
         }
     ) { padding ->
-        // Chat area
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .background(Color(0xFF0B141A)) // WhatsApp Dark Mode Background
+                .background(Color(0xFF0B141A))
         ) {
             LazyColumn(
                 state = listState,
@@ -140,7 +136,6 @@ fun SimulatorScreen(viewModel: AppViewModel, onBack: () -> Unit) {
 
 @Composable
 fun ChatBubble(message: ChatMessage) {
-    // WhatsApp Dark Mode colors
     val bubbleColor = if (message.isUser) Color(0xFF005C4B) else Color(0xFF202C33)
     val alignment = if (message.isUser) Alignment.End else Alignment.Start
     val shape = if (message.isUser) {
