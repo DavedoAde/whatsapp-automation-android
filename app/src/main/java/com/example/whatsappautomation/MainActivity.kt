@@ -3,6 +3,7 @@ package com.example.whatsappautomation
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -20,6 +21,8 @@ import androidx.navigation.navArgument
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // This is the magic command for modern Android UI
+        enableEdgeToEdge() 
         setContent {
             WhatsAppAutomationTheme {
                 MainAppScreen()
@@ -37,7 +40,6 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
     
-    // Hide top and bottom bars on secondary screens (Simulator, Rule Editor)
     val isMainScreen = currentRoute in listOf(Screen.Dashboard.route, Screen.Contacts.route, Screen.Rules.route)
 
     Scaffold(
@@ -91,7 +93,6 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
                 SimulatorScreen(viewModel, onBack = { navController.popBackStack() }) 
             }
 
-            // Route handles both top-level rules (parentId = 0) and submenu rules (parentId != 0)
             composable(
                 route = "rule_editor/{ruleId}/{parentId}",
                 arguments = listOf(
@@ -115,6 +116,7 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
                         navController.popBackStack()
                     },
                     onAddChildRule = { parentRuleId ->
+                        // This opens the exact same Rule Editor screen, but linked to the parent!
                         navController.navigate("rule_editor/0/$parentRuleId")
                     },
                     onEditChildRule = { childId ->
