@@ -66,9 +66,14 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
             startDestination = Screen.Dashboard.route,
             modifier = Modifier.padding(innerPadding)
         ) {
-            composable(Screen.Dashboard.route) { DashboardScreen(viewModel) }
+            composable(Screen.Dashboard.route) { 
+                DashboardScreen(viewModel, onNavigateToSimulator = { navController.navigate("simulator") }) 
+            }
             composable(Screen.Contacts.route) { ContactsScreen() }
             composable(Screen.Rules.route) { RulesScreen(viewModel) }
+            composable("simulator") { 
+                SimulatorScreen(viewModel, onBack = { navController.popBackStack() }) 
+            }
         }
     }
 }
