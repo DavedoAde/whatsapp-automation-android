@@ -28,7 +28,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val activeRulesCount = ruleDao.getActiveRuleCount()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
-    // Now we get the list of contacts for the Contacts Screen
     val allContacts = contactDao.getAllContacts()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -38,14 +37,15 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val allRules = ruleDao.getAllRules()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    fun addRule(name: String, keyword: String, reply: String) {
+    fun addRule(name: String, keyword: String, reply: String, actionType: String) {
         viewModelScope.launch {
             val newRule = AutomationRule(
                 name = name,
                 triggerKeyword = keyword,
                 replyMessage = reply,
                 isActive = true,
-                priority = 1
+                priority = 1,
+                actionType = actionType
             )
             ruleDao.insertRule(newRule)
         }
@@ -66,26 +66,22 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     // --- SIMULATOR & CONVERSATION LOGIC ---
     private var currentCaptureState = CaptureState.IDLE
     private var currentTempName: String? = null
-    private var currentSenderId = "+1234567890" // Mock sender ID for simulation
+    private var currentSenderId = "+1234567890" 
 
     fun simulateMessage(message: String): String {
-        // 1. Check if we are in a contact capture flow
-        val flowResponse = ConversationManager.processMessage(message, currentCaptureState, currentTempName)
-        
-        if (flowResponse.reply.isNotEmpty()) {
-            // Update the state for the next message
+        // 1. If we are already in a conversation flow, process it
+        if (currentCaptureState != CaptureState.IDLE) {
+            val flowResponse = ConversationManager.processMessage(message, currentCaptureState, currentTempName)
+            
             currentCaptureState = flowResponse.nextState
             currentTempName = flowResponse.tempName
 
-            // If the flow says "Save this contact", write to database
             if (flowResponse.saveContact && currentTempName != null) {
                 viewModelScope.launch {
                     val newContact = Contact(
                         phoneNumber = currentSenderId,
                         name = currentTempName!!,
-                        sourceApp = "WhatsApp",
-                        isConfirmed = true,
-                        leadStatus = "New"
+                        sourceApp = "WhatsApp"
                     )
                     contactDao.insertContact(newContact)
                 }
@@ -93,12 +89,19 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             return flowResponse.reply
         }
 
-        // 2. If not in a flow, check standard rules
-        val currentRules = allRules.value
-        val matchedRule = RuleEngine.findMatchingRule(message, currentRules)
+        // 2. If not in a flow, check the user's rules
+        val matchedRule = RuleEngine.findMatchingRule(message, allRules.value)
         
         return if (matchedRule != null) {
-            matchedRule.replyMessage
+            if (matchedRule.actionType == "CAPTURE_CONTACT") {
+                // Trigger the flow!
+                currentCaptureState = CaptureState.AWAITING_NAME
+                // Use the rule's reply as the welcome message, or a default one
+                matchedRule.replyMessage.ifBlank { "Welcome! What should I call you?" }
+            } else {
+                // Standard auto-reply
+                matchedRule.replyMessage
+            }
         } else {
             "No rule matched. (No reply sent)"
         }
