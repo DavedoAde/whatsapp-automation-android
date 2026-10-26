@@ -5,15 +5,18 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Face
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -28,7 +31,7 @@ fun SimulatorScreen(viewModel: AppViewModel, onBack: () -> Unit) {
 
     LaunchedEffect(Unit) {
         if (messages.isEmpty()) {
-            messages.add(ChatMessage("Simulator ready. Type a message below to test your rules.", false))
+            messages.add(ChatMessage("Hello, I'm your AutoResponder! You can test the rules by sending messages to this chat.", false))
         }
     }
 
@@ -38,76 +41,97 @@ fun SimulatorScreen(viewModel: AppViewModel, onBack: () -> Unit) {
         }
     }
 
+    // The Scaffold ensures we have a proper structure
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Chat Simulator") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack, 
-                            contentDescription = "Back",
-                            tint = MaterialTheme.colorScheme.onSurface
-                        )
+                title = { 
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        // Mock WhatsApp Avatar
+                        Surface(
+                            shape = CircleShape,
+                            color = Color(0xFF00A884), // WhatsApp green
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text("🤖", fontSize = 20.sp)
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text("Chat Simulator", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                            Text("Online", fontSize = 12.sp, color = Color(0xFF00A884))
+                        }
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF1F2C34)) // WhatsApp Dark Mode Header
             )
-        }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .background(MaterialTheme.colorScheme.background)
-        ) {
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding = PaddingValues(vertical = 8.dp)
-            ) {
-                items(messages) { message ->
-                    ChatBubble(message)
-                }
-            }
-
+        },
+        bottomBar = {
+            // This is the input area. 
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surface)
-                    .padding(8.dp),
+                    .background(Color(0xFF1F2C34)) // Match header
+                    .padding(8.dp)
+                    .imePadding(), // <--- THE MAGIC FIX: Pushes input above keyboard
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 OutlinedTextField(
                     value = inputMessage,
                     onValueChange = { inputMessage = it },
-                    placeholder = { Text("Type a message...") },
+                    placeholder = { Text("Message") },
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(24.dp),
-                    maxLines = 3
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = Color(0xFF2A3942),
+                        unfocusedContainerColor = Color(0xFF2A3942),
+                        focusedBorderColor = Color.Transparent,
+                        unfocusedBorderColor = Color.Transparent
+                    ),
+                    maxLines = 4
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                IconButton(
+                FloatingActionButton(
                     onClick = {
                         if (inputMessage.isNotBlank()) {
                             val userText = inputMessage
                             messages.add(ChatMessage(userText, true))
                             inputMessage = ""
 
-                            // FIXED: The ViewModel now returns a plain String (the reply)
                             val botReplyText = viewModel.simulateMessage(userText)
-                            
-                            // Add the bot's reply directly
                             messages.add(ChatMessage(botReplyText, false))
                         }
                     },
-                    enabled = inputMessage.isNotBlank(),
-                    modifier = Modifier
-                        .background(if (inputMessage.isNotBlank()) MaterialTheme.colorScheme.primary else Color.Gray, RoundedCornerShape(50))
-                        .padding(4.dp)
+                    containerColor = Color(0xFF00A884),
+                    shape = CircleShape,
+                    modifier = Modifier.size(48.dp)
                 ) {
                     Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send", tint = Color.White)
+                }
+            }
+        }
+    ) { padding ->
+        // Chat area
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .background(Color(0xFF0B141A)) // WhatsApp Dark Mode Background
+        ) {
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(vertical = 8.dp)
+            ) {
+                items(messages) { message ->
+                    ChatBubble(message)
                 }
             }
         }
@@ -116,7 +140,8 @@ fun SimulatorScreen(viewModel: AppViewModel, onBack: () -> Unit) {
 
 @Composable
 fun ChatBubble(message: ChatMessage) {
-    val bubbleColor = if (message.isUser) Color(0xFF005C4B) else MaterialTheme.colorScheme.surface
+    // WhatsApp Dark Mode colors
+    val bubbleColor = if (message.isUser) Color(0xFF005C4B) else Color(0xFF202C33)
     val alignment = if (message.isUser) Alignment.End else Alignment.Start
     val shape = if (message.isUser) {
         RoundedCornerShape(16.dp, 16.dp, 0.dp, 16.dp)
@@ -129,11 +154,11 @@ fun ChatBubble(message: ChatMessage) {
             modifier = Modifier
                 .background(bubbleColor, shape)
                 .padding(12.dp)
-                .widthIn(max = 280.dp)
+                .widthIn(max = 300.dp)
         ) {
             Text(
                 text = message.text,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = Color(0xFFE9EDEF),
                 fontSize = 15.sp
             )
         }
