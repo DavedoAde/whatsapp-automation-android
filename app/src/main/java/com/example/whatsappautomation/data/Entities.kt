@@ -19,16 +19,25 @@ data class AutomationRule(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val name: String,
     val triggerKeyword: String,
-    val replyMessage: String,
+    val replyMessage: String, 
     val isActive: Boolean = true,
     val priority: Int = 1,
     
-    // New fields based on AutoResponder.ai
-    val matchType: String = "SIMILARITY", // EXACT, SIMILARITY, REGEX
-    val actionType: String = "AUTO_REPLY", // AUTO_REPLY or CAPTURE_CONTACT
+    // Advanced Match Types: EXACT, SIMILARITY, PATTERN, REGEX
+    val matchType: String = "SIMILARITY", 
+    
+    // Action Type: AUTO_REPLY, CAPTURE_CONTACT
+    val actionType: String = "AUTO_REPLY", 
+    
+    // Reply Mode: SINGLE, ALL, RANDOM
+    val replyMode: String = "SINGLE", 
+    
     val delaySeconds: Int = 0,
-    val recipientType: String = "BOTH", // INDIVIDUALS, GROUPS, BOTH
+    val recipientType: String = "BOTH", 
     val requireScreenOff: Boolean = false,
     val requireCharging: Boolean = false,
-    val requireDnd: Boolean = false
+    val requireDnd: Boolean = false,
+    
+    // Links a submenu to its parent rule
+    val parentRuleId: Long? = null 
 )
