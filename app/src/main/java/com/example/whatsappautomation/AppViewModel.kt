@@ -17,7 +17,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val contactDao = database.contactDao()
     private val ruleDao = database.ruleDao()
 
-    // Local UI State
     private val _isAutomationActive = MutableStateFlow(true)
     val isAutomationActive: StateFlow<Boolean> = _isAutomationActive
 
@@ -25,18 +24,15 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         _isAutomationActive.value = isActive
     }
 
-    // Read from database
     val activeRulesCount = ruleDao.getActiveRuleCount()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
     val totalContactsCount = contactDao.getContactCount()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
-    // Get all rules for the Rules Screen
     val allRules = ruleDao.getAllRules()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // Add a new rule
     fun addRule(name: String, keyword: String, reply: String) {
         viewModelScope.launch {
             val newRule = AutomationRule(
@@ -44,9 +40,15 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 triggerKeyword = keyword,
                 replyMessage = reply,
                 isActive = true,
-                priority = 1 // Default priority
+                priority = 1
             )
             ruleDao.insertRule(newRule)
         }
+    }
+
+    // New function to simulate incoming messages
+    fun simulateMessage(message: String): AutomationRule? {
+        val currentRules = allRules.value
+        return RuleEngine.findMatchingRule(message, currentRules)
     }
 }
