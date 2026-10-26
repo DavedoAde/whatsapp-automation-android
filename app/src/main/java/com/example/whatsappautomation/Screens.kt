@@ -167,11 +167,14 @@ fun ContactCard(contact: Contact) {
 
 @Composable
 fun RulesScreen(viewModel: AppViewModel, onEditRule: (Long) -> Unit) {
-    val rules by viewModel.allRules.collectAsState()
+    val allRules by viewModel.allRules.collectAsState()
+    // Only show top-level rules in the main list
+    val topLevelRules = allRules.filter { it.parentRuleId == null }
+    
     var ruleToDelete by remember { mutableStateOf<AutomationRule?>(null) }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        if (rules.isEmpty()) {
+        if (topLevelRules.isEmpty()) {
             Text(
                 "No rules created yet.\nTap + to add one.", 
                 modifier = Modifier.align(Alignment.Center),
@@ -182,7 +185,7 @@ fun RulesScreen(viewModel: AppViewModel, onEditRule: (Long) -> Unit) {
                 modifier = Modifier.fillMaxSize().padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(rules) { rule ->
+                items(topLevelRules) { rule ->
                     RuleCard(
                         rule = rule,
                         onEditClick = { onEditRule(rule.id) },
@@ -193,7 +196,7 @@ fun RulesScreen(viewModel: AppViewModel, onEditRule: (Long) -> Unit) {
         }
 
         FloatingActionButton(
-            onClick = { onEditRule(0L) }, // 0L means new rule
+            onClick = { onEditRule(0L) },
             modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
             containerColor = MaterialTheme.colorScheme.primary
         ) {
