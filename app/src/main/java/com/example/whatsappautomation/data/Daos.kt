@@ -26,6 +26,9 @@ interface RuleDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertRule(rule: AutomationRule)
     
+    @Query("DELETE FROM rules WHERE id = :ruleId")
+    suspend fun deleteRuleById(ruleId: Long)
+    
     @Query("SELECT COUNT(*) FROM rules WHERE isActive = 1")
     fun getActiveRuleCount(): Flow<Int>
 }
