@@ -36,7 +36,10 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
         topBar = {
             TopAppBar(
                 title = { Text("WhatsApp Automation", color = MaterialTheme.colorScheme.primary) },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    titleContentColor = MaterialTheme.colorScheme.primary
+                )
             )
         },
         bottomBar = {
@@ -84,6 +87,7 @@ fun WhatsAppAutomationTheme(content: @Composable () -> Unit) {
     val charcoal = Color(0xFF1E2A3A)
     val accentGreen = Color(0xFF4CAF50)
     val textLight = Color(0xFFE0E0E0)
+    val bubbleGreen = Color(0xFF005C4B) // WhatsApp dark mode green
 
     MaterialTheme(
         colorScheme = darkColorScheme(
@@ -91,7 +95,8 @@ fun WhatsAppAutomationTheme(content: @Composable () -> Unit) {
             background = darkNavy,
             surface = charcoal,
             onBackground = textLight,
-            onSurface = textLight
+            onSurface = textLight,
+            tertiary = bubbleGreen
         ),
         content = content
     )
