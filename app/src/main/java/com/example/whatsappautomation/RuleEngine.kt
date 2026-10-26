@@ -21,7 +21,7 @@ object RuleEngine {
                         false
                     }
                 }
-                "WELCOME" -> true // In the simulator, we will trigger this immediately for testing
+                "WELCOME" -> true 
                 else -> message.contains(rule.triggerKeyword, ignoreCase = true)
             }
 
@@ -30,7 +30,6 @@ object RuleEngine {
         return null
     }
 
-    // 1. EXACT MATCH (Ignores case, punctuation, and extra spaces)
     private fun normalizeText(text: String): String {
         return text.lowercase()
             .replace(Regex("[^a-z0-9\\s]"), "") 
@@ -38,7 +37,6 @@ object RuleEngine {
             .trim()
     }
 
-    // 2. SIMILARITY MATCH (Levenshtein Distance / Typo tolerance)
     private fun calculateSimilarity(s1: String, s2: String): Double {
         val longer = if (s1.length > s2.length) s1 else s2
         val shorter = if (s1.length > s2.length) s2 else s1
@@ -68,7 +66,6 @@ object RuleEngine {
         return cost[lhsLength - 1][rhsLength - 1]
     }
 
-    // 3. PATTERN MATCH (Wildcards: * for anything, // for OR)
     private fun checkWildcardPattern(message: String, pattern: String): Boolean {
         val regexPattern = pattern
             .replace("//", "|")
@@ -80,19 +77,22 @@ object RuleEngine {
         }
     }
 
-    // 4. GET REPLY (Handles Single, All, Random)
-    fun getReplyText(rule: AutomationRule): String {
+    // Updated to handle {name} and {number} replacements
+    fun getReplyText(rule: AutomationRule, name: String = "", number: String = ""): String {
         val replies = rule.replyMessage.split("|").filter { it.isNotBlank() }
         if (replies.isEmpty()) return ""
 
-        return when (rule.replyMode) {
+        val selectedReply = when (rule.replyMode) {
             "ALL" -> replies.joinToString("\n\n")
             "RANDOM" -> replies.random()
             else -> replies.first()
         }
+
+        return selectedReply
+            .replace("{name}", if (name.isNotBlank()) name else "there")
+            .replace("{number}", number)
     }
 
-    // 5. TASKER LOGIC: Smart Name Extractor
     fun extractName(input: String): String {
         val lower = input.trim().lowercase()
         val prefixes = listOf("my name is ", "i am ", "im ", "call me ", "it's ", "its ")
