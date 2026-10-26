@@ -35,7 +35,6 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
     
-    // Check if we are on one of the main tabs. If not, hide the top and bottom bars.
     val isMainScreen = currentRoute in listOf(Screen.Dashboard.route, Screen.Contacts.route, Screen.Rules.route)
 
     Scaffold(
@@ -79,7 +78,7 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
             composable(Screen.Dashboard.route) { 
                 DashboardScreen(viewModel, onNavigateToSimulator = { navController.navigate("simulator") }) 
             }
-            composable(Screen.Contacts.route) { ContactsScreen() }
+            composable(Screen.Contacts.route) { ContactsScreen(viewModel) }
             composable(Screen.Rules.route) { RulesScreen(viewModel) }
             composable("simulator") { 
                 SimulatorScreen(viewModel, onBack = { navController.popBackStack() }) 
