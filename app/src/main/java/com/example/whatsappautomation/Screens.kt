@@ -39,7 +39,7 @@ fun BatteryOptimizationScreen(onBack: () -> Unit, onRetry: () -> Unit) {
 
 // --- DASHBOARD ---
 @Composable
-fun DashboardScreen(viewModel: AppViewModel, onNavigateToSimulator: () -> Unit) {
+fun DashboardScreen(viewModel: AppViewModel) {
     val activeRulesCount by viewModel.activeRulesCount.collectAsState()
     val totalContactsCount by viewModel.totalContactsCount.collectAsState()
     
@@ -51,15 +51,6 @@ fun DashboardScreen(viewModel: AppViewModel, onNavigateToSimulator: () -> Unit) 
         }
 
         Spacer(modifier = Modifier.weight(1f))
-
-        Button(
-            onClick = onNavigateToSimulator, 
-            modifier = Modifier.fillMaxWidth().height(56.dp),
-            shape = RoundedCornerShape(16.dp)
-        ) {
-            Icon(Icons.Default.Chat, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
-            Text("Open Chat Simulator", fontSize = 16.sp, fontWeight = FontWeight.Bold)
-        }
     }
 }
 
