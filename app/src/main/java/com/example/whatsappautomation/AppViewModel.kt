@@ -43,6 +43,13 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun deleteRule(rule: AutomationRule) {
         viewModelScope.launch { ruleDao.deleteRuleById(rule.id) }
     }
+    
+    // NEW: Toggle rule directly from list
+    fun toggleRuleActiveState(rule: AutomationRule) {
+        viewModelScope.launch {
+            ruleDao.insertRule(rule.copy(isActive = !rule.isActive))
+        }
+    }
 
     private var currentSenderId = "+1234567890" 
 
