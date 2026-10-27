@@ -21,8 +21,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
-import androidx.core.app.NotificationManagerCompat
-import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -77,17 +75,16 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
     val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
     var showBatteryDialog by remember { mutableStateOf(false) }
 
-    // Check battery status when app opens/resumes
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                // Only check if we are past the welcome screen
+                // Only check if we are past the welcome screen and NOT on the very first launch session
                 if (currentRoute != "welcome") {
                     val isOptimized = !powerManager.isIgnoringBatteryOptimizations(context.packageName)
+                    // Ensure it only shows AFTER they have completed the initial setup once
+                    val hasCompletedOnboarding = !PreferenceManager.isFirstLaunch(context)
                     
-                    // If it is optimized (restricted), show the dialog. 
-                    // If it is unrestricted, hide the dialog.
-                    if (isOptimized) {
+                    if (isOptimized && hasCompletedOnboarding) {
                         showBatteryDialog = true
                     } else {
                         showBatteryDialog = false
@@ -107,7 +104,6 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
                 TopAppBar(
                     title = { Text("WhatsApp Automation", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleLarge) },
                     actions = {
-                        // Master ON/OFF Switch
                         Switch(
                             checked = isAutomationActive,
                             onCheckedChange = { isChecked ->
@@ -215,14 +211,9 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
         }
     }
 
-    // --- THE STRICT BATTERY REMINDER DIALOG ---
     if (showBatteryDialog) {
         AlertDialog(
-            onDismissRequest = { 
-                // Optional: If they tap outside, do nothing so it forces them to make a choice, 
-                // or you can just let it close. I'll let it close if they tap outside.
-                showBatteryDialog = false 
-            },
+            onDismissRequest = { showBatteryDialog = false },
             title = { Text("Battery Optimization is ON") },
             text = { 
                 Text("Your phone is restricting background apps. To ensure auto-replies work reliably, please set battery usage to 'Unrestricted' in settings.") 
