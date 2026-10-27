@@ -16,12 +16,19 @@ interface ContactDao {
     
     @Query("SELECT COUNT(*) FROM contacts")
     fun getContactCount(): Flow<Int>
+    
+    @Query("SELECT * FROM contacts WHERE phoneNumber = :number LIMIT 1")
+    suspend fun getContactByNumber(number: String): Contact?
 }
 
 @Dao
 interface RuleDao {
     @Query("SELECT * FROM rules ORDER BY priority ASC")
     fun getAllRules(): Flow<List<AutomationRule>>
+    
+    // Synchronous getter for the background service
+    @Query("SELECT * FROM rules ORDER BY priority ASC")
+    suspend fun getAllRulesSync(): List<AutomationRule>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertRule(rule: AutomationRule)
