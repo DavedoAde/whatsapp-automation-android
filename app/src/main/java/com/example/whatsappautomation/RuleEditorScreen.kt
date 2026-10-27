@@ -15,6 +15,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.whatsappautomation.data.AutomationRule
@@ -35,6 +37,10 @@ fun RuleEditorScreen(
     var targetChat by rememberSaveable(existingRule?.id) { mutableStateOf(existingRule?.targetChat ?: "ALL") }
     var replyMode by rememberSaveable(existingRule?.id) { mutableStateOf(existingRule?.replyMode ?: "SINGLE") }
     
+    // Delay State
+    var delayMin by rememberSaveable(existingRule?.id) { mutableStateOf(existingRule?.delayMin?.toString() ?: "0") }
+    var delayMax by rememberSaveable(existingRule?.id) { mutableStateOf(existingRule?.delayMax?.toString() ?: "0") }
+
     // Save Lead State
     var askForName by rememberSaveable(existingRule?.id) { mutableStateOf(existingRule?.askForName ?: false) }
     var promptQuestion by rememberSaveable(existingRule?.id) { mutableStateOf(existingRule?.promptQuestion ?: "What's your name?") }
@@ -99,6 +105,8 @@ fun RuleEditorScreen(
                             matchType = matchType,
                             targetChat = targetChat,
                             replyMode = replyMode,
+                            delayMin = delayMin.toIntOrNull() ?: 0,
+                            delayMax = delayMax.toIntOrNull() ?: 0,
                             askForName = askForName,
                             promptQuestion = promptQuestion,
                             confirmQuestion = confirmQuestion,
@@ -115,6 +123,8 @@ fun RuleEditorScreen(
                             matchType = matchType,
                             targetChat = targetChat,
                             replyMode = replyMode,
+                            delayMin = delayMin.toIntOrNull() ?: 0,
+                            delayMax = delayMax.toIntOrNull() ?: 0,
                             askForName = askForName,
                             promptQuestion = promptQuestion,
                             confirmQuestion = confirmQuestion,
@@ -202,16 +212,22 @@ fun RuleEditorScreen(
                 }
                 Spacer(modifier = Modifier.height(8.dp))
                 
+                // DYNAMIC REPLIES LIST
                 replies.forEachIndexed { index, reply ->
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
                         OutlinedTextField(
                             value = reply,
                             onValueChange = { replies[index] = it },
-                            label = { Text("Should be sent") },
+                            label = { Text("Should be sent (${index + 1})") },
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(12.dp),
                             minLines = 2
                         )
+                        if (replies.size > 1) {
+                            IconButton(onClick = { replies.removeAt(index) }) {
+                                Icon(Icons.Default.RemoveCircleOutline, contentDescription = "Remove", tint = MaterialTheme.colorScheme.error)
+                            }
+                        }
                     }
                 }
 
@@ -231,12 +247,38 @@ fun RuleEditorScreen(
                         Text("Random")
                     }
                     Spacer(modifier = Modifier.weight(1f))
-                    IconButton(onClick = { if (replies.size > 1) replies.removeAt(replies.size - 1) }) {
-                        Icon(Icons.Default.RemoveCircleOutline, contentDescription = "Remove", tint = MaterialTheme.colorScheme.error)
+                    // PROMINENT ADD BUTTON
+                    Button(
+                        onClick = { replies.add("") }, 
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                        modifier = Modifier.height(36.dp)
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = "Add Reply", modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Add", fontSize = 12.sp)
                     }
-                    IconButton(onClick = { replies.add("") }) {
-                        Icon(Icons.Default.AddCircleOutline, contentDescription = "Add", tint = MaterialTheme.colorScheme.primary)
-                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+                // DELAY SECTION
+                Text("Delay in seconds", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = delayMin,
+                        onValueChange = { delayMin = it },
+                        label = { Text("min") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    OutlinedTextField(
+                        value = delayMax,
+                        onValueChange = { delayMax = it },
+                        label = { Text("max") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp)
+                    )
                 }
             }
 
