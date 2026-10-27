@@ -12,7 +12,7 @@ data class Contact(
     val captureDate: Long = System.currentTimeMillis(),
     val isConfirmed: Boolean = true,
     val leadStatus: String = "New",
-    val tags: String = "" // e.g., "TikTok, Facebook"
+    val tags: String = "" 
 )
 
 @Entity(tableName = "rules")
@@ -20,18 +20,18 @@ data class AutomationRule(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val name: String,
     val triggerKeyword: String,
-    val replyMessage: String, // Pipe-separated string for multiple replies
+    val replyMessage: String, 
     val isActive: Boolean = true,
     val priority: Int = 1,
     
-    // Card 1: Received Message
-    val matchType: String = "SIMILARITY", // EXACT, SIMILARITY, PATTERN, REGEX, WELCOME
-    val targetChat: String = "ALL", // ALL, INDIVIDUALS, GROUPS
+    val matchType: String = "SIMILARITY", 
+    val targetChat: String = "ALL", 
+    val replyMode: String = "SINGLE", 
     
-    // Card 2 & 3: Replies
-    val replyMode: String = "SINGLE", // SINGLE, ALL, RANDOM
+    // NEW: Delay feature
+    val delayMin: Int = 0,
+    val delayMax: Int = 0,
     
-    // Card 4: Save Lead Machine
     val askForName: Boolean = false,
     val promptQuestion: String = "What's your name?",
     val confirmQuestion: String = "Is your name {name}? Reply YES or NO.",
@@ -39,11 +39,9 @@ data class AutomationRule(
     val successMessage: String = "Thank you {name}! Your details have been saved.",
     val assignTag: String = "", 
     
-    // Card 5: Conditions
     val requireScreenOff: Boolean = false,
     val requireCharging: Boolean = false,
     val requireDnd: Boolean = false,
     
-    // Submenus
     val parentRuleId: Long? = null 
 )
