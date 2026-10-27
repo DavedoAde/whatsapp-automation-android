@@ -5,12 +5,9 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -40,8 +37,8 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
     val navController = rememberNavController()
     val screens = listOf(
         Screen.Dashboard, 
-        Screen.Contacts, 
         Screen.Rules,
+        Screen.Contacts, 
         Screen.Settings
     )
     
@@ -55,12 +52,26 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
         Screen.Settings.route
     )
 
+    val isAutomationActive by viewModel.isAutomationActive.collectAsState()
+
     Scaffold(
         topBar = {
             if (isMainScreen) {
                 TopAppBar(
-                    title = { Text("WhatsApp Automation", color = MaterialTheme.colorScheme.primary) },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
+                    title = { Text("WhatsApp Automation", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleLarge) },
+                    actions = {
+                        // Master ON/OFF Switch
+                        Switch(
+                            checked = isAutomationActive,
+                            onCheckedChange = { viewModel.toggleAutomation(it) },
+                            modifier = Modifier.padding(end = 16.dp),
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = MaterialTheme.colorScheme.primary,
+                                checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+                            )
+                        )
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
                 )
             }
         },
@@ -72,6 +83,11 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
                             icon = { Icon(screen.icon, contentDescription = screen.title) },
                             label = { Text(screen.title) },
                             selected = currentRoute == screen.route,
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = MaterialTheme.colorScheme.primary,
+                                selectedTextColor = MaterialTheme.colorScheme.primary,
+                                indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                            ),
                             onClick = {
                                 navController.navigate(screen.route) {
                                     popUpTo(navController.graph.startDestinationId) { saveState = true }
@@ -93,16 +109,15 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
             composable(Screen.Dashboard.route) { 
                 DashboardScreen(viewModel, onNavigateToSimulator = { navController.navigate("simulator") }) 
             }
-            composable(Screen.Contacts.route) { ContactsScreen(viewModel) }
             composable(Screen.Rules.route) { 
                 RulesScreen(
                     viewModel = viewModel,
                     onEditRule = { ruleId -> navController.navigate("rule_editor/$ruleId/0") }
                 ) 
             }
-            composable(Screen.Settings.route) {
-                SettingsScreen()
-            }
+            composable(Screen.Contacts.route) { ContactsScreen(viewModel) }
+            composable(Screen.Settings.route) { SettingsScreen() }
+            
             composable("simulator") { 
                 SimulatorScreen(viewModel, onBack = { navController.popBackStack() }) 
             }
@@ -141,20 +156,24 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
     }
 }
 
+// --- NEW PREMIUM THEME COLORS ---
 @Composable
 fun WhatsAppAutomationTheme(content: @Composable () -> Unit) {
-    val darkNavy = Color(0xFF0A1929)
-    val charcoal = Color(0xFF1E2A3A)
-    val accentGreen = Color(0xFF4CAF50)
-    val textLight = Color(0xFFE0E0E0)
+    val deepObsidian = Color(0xFF0B141A)  // Very dark background
+    val lighterCard = Color(0xFF1F2C34)   // Card surface color
+    val accentGreen = Color(0xFF25D366)   // Vibrant green
+    val textLight = Color(0xFFE9EDEF)     // White-ish text
+    val textMuted = Color(0xFF8696A0)     // Grey text
 
     MaterialTheme(
         colorScheme = darkColorScheme(
             primary = accentGreen,
-            background = darkNavy,
-            surface = charcoal,
+            background = deepObsidian,
+            surface = lighterCard,
             onBackground = textLight,
-            onSurface = textLight
+            onSurface = textLight,
+            tertiary = Color(0xFFBB86FC), // Soft purple for Tags
+            onTertiary = Color.Black
         ),
         content = content
     )
