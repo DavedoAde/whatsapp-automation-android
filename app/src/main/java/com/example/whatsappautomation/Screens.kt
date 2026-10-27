@@ -1,7 +1,9 @@
 package com.example.whatsappautomation
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
@@ -67,15 +69,34 @@ fun DashboardScreen(viewModel: AppViewModel, onNavigateToSimulator: () -> Unit) 
             }
         }
 
+        // Permissions Checklist
         if (!hasContactPermission) {
             Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Permission Required", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onErrorContainer)
-                    Text("Grant contact access to automatically save new leads to your phone's address book.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onErrorContainer)
+                    Text("Contacts Permission Required", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onErrorContainer)
+                    Text("Grant access to save new leads to your phone's address book.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onErrorContainer)
                     Spacer(modifier = Modifier.height(8.dp))
                     Button(onClick = { permissionLauncher.launch(Manifest.permission.WRITE_CONTACTS) }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) {
-                        Text("Grant Permission")
+                        Text("Grant Contact Access")
                     }
+                }
+            }
+        }
+
+        // Notification Access Button
+        Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("Notification Access Required", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSecondaryContainer)
+                Text("You must grant Notification Access so the app can read WhatsApp messages.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSecondaryContainer)
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(
+                    onClick = {
+                        val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
+                        context.startActivity(intent)
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+                ) {
+                    Text("Open Notification Settings")
                 }
             }
         }
