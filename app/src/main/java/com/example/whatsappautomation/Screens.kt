@@ -13,18 +13,125 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.whatsappautomation.data.AutomationRule
 import com.example.whatsappautomation.data.Contact
+
+// --- NEW: BATTERY OPTIMIZATION SCREEN ---
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun BatteryOptimizationScreen(onBack: () -> Unit) {
+    val context = LocalContext.current
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("AutoResponder for WA") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    titleContentColor = Color.White,
+                    navigationIconContentColor = Color.White
+                )
+            )
+        }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .background(MaterialTheme.colorScheme.primary)
+                .padding(32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = "Disable the battery optimization, remove background restrictions, and enable autostart for AutoResponder in the settings of your device.",
+                color = Color.White,
+                fontSize = 18.sp,
+                textAlign = TextAlign.Center,
+                fontWeight = FontWeight.Medium
+            )
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            Button(
+                onClick = {
+                    try {
+                        val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+                        intent.data = Uri.parse("package:${context.packageName}")
+                        context.startActivity(intent)
+                    } catch (e: Exception) {
+                        // Fallback for restrictive phones
+                        val fallbackIntent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                        fallbackIntent.data = Uri.parse("package:${context.packageName}")
+                        context.startActivity(fallbackIntent)
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F)), // Red button
+                shape = RoundedCornerShape(24.dp),
+                modifier = Modifier.width(200.dp).height(50.dp)
+            ) {
+                Text("SETTINGS", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            Text("+", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+            
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Button(
+                onClick = {
+                    // Same fallback in case they need to manually find it
+                    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                    intent.data = Uri.parse("package:${context.packageName}")
+                    context.startActivity(intent)
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F)),
+                shape = RoundedCornerShape(24.dp),
+                modifier = Modifier.width(200.dp).height(50.dp)
+            ) {
+                Text("SETTINGS", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            Text(
+                text = "Can't find all settings or need further help?",
+                color = Color.White,
+                fontSize = 14.sp,
+                textAlign = TextAlign.Center
+            )
+            Text(
+                text = "https://dontkillmyapp.com/?app=WhatsAppAutomation",
+                color = Color.White,
+                fontSize = 14.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.clickable {
+                    val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://dontkillmyapp.com/"))
+                    context.startActivity(browserIntent)
+                }
+            )
+        }
+    }
+}
 
 // --- DASHBOARD ---
 @Composable
@@ -242,7 +349,6 @@ fun RuleCard(rule: AutomationRule, onToggleClick: () -> Unit, onEditClick: () ->
 // --- SETTINGS ---
 @Composable
 fun SettingsScreen() {
-    val context = LocalContext.current
     var enableOriginalWA by remember { mutableStateOf(true) }
     var enableWABusiness by remember { mutableStateOf(true) }
     var enableMultiUser by remember { mutableStateOf(false) }
@@ -250,25 +356,6 @@ fun SettingsScreen() {
     Column(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text("Settings", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
         
-        // Battery Optimization Card (CRITICAL FOR BACKGROUND SERVICE)
-        Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text("Battery Optimization", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onErrorContainer)
-                Text("Android may kill the background listener to save battery. Disable optimization to keep the bot running 24/7.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onErrorContainer)
-                Spacer(modifier = Modifier.height(8.dp))
-                Button(
-                    onClick = {
-                        val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
-                        intent.data = Uri.parse("package:${context.packageName}")
-                        context.startActivity(intent)
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                ) {
-                    Text("Disable Battery Optimization")
-                }
-            }
-        }
-
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text("Version of WA", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
