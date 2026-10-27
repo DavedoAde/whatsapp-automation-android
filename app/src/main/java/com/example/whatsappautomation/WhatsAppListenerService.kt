@@ -6,6 +6,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
+import android.util.Log
 import com.example.whatsappautomation.data.AppDatabase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -18,6 +19,7 @@ class WhatsAppListenerService : NotificationListenerService() {
 
     private val scope = CoroutineScope(Dispatchers.IO)
     private lateinit var database: AppDatabase
+    private val TAG = "WAListener"
 
     override fun onCreate() {
         super.onCreate()
@@ -26,7 +28,17 @@ class WhatsAppListenerService : NotificationListenerService() {
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         val packageName = sbn.packageName
-        if (packageName != "com.whatsapp" && packageName != "com.whatsapp.w4b") return
+        
+        // Check if enabled in settings
+        if (packageName == "com.whatsapp") {
+            if (!PreferenceManager.isWaOriginalEnabled(applicationContext)) return
+        } else if (packageName == "com.whatsapp.w4b") {
+            if (!PreferenceManager.isWaBusinessEnabled(applicationContext)) return
+        } else {
+            return // Not a WhatsApp package
+        }
+        
+        // Ignore group summaries and ongoing events
         if ((sbn.notification.flags and Notification.FLAG_GROUP_SUMMARY) != 0) return
         if ((sbn.notification.flags and Notification.FLAG_ONGOING_EVENT) != 0) return
 
@@ -43,8 +55,13 @@ class WhatsAppListenerService : NotificationListenerService() {
             }
         }
 
-        if (messageText.isBlank()) return
+        if (messageText.isBlank()) {
+            Log.d(TAG, "Message text is blank. Ignoring.")
+            return
+        }
         
+        Log.d(TAG, "Received message from $senderName: $messageText")
+
         val notificationTime = sbn.postTime
         if (notificationTime <= BotStateManager.lastNotificationTime) return
         BotStateManager.lastNotificationTime = notificationTime
@@ -59,18 +76,19 @@ class WhatsAppListenerService : NotificationListenerService() {
             val result = processIncomingMessage(senderName, messageText)
             
             if (result != null && !result.replyText.isNullOrBlank()) {
+                Log.d(TAG, "Bot is replying to $senderName: ${result.replyText}")
                 
-                // --- THE DELAY LOGIC ---
                 if (result.delayMax > 0) {
                     val min = result.delayMin
                     val max = result.delayMax
                     val randomDelaySeconds = if (max > min) Random.nextInt(min, max) else min
-                    
-                    // Convert to milliseconds and wait
                     delay(randomDelaySeconds * 1000L) 
                 }
 
-                val remoteInputAction = sbn.notification.actions?.find { it.remoteInputs != null }
+                // Find the RemoteInput action
+                val remoteInputAction = sbn.notification.actions?.find { action ->
+                    action.remoteInputs != null && action.remoteInputs.isNotEmpty()
+                }
                 
                 if (remoteInputAction != null) {
                     val remoteInput = remoteInputAction.remoteInputs[0]
@@ -84,16 +102,18 @@ class WhatsAppListenerService : NotificationListenerService() {
                         try {
                             remoteInputAction.actionIntent.send(applicationContext, 0, intent)
                             BotStateManager.recordSentMessage(senderName, result.replyText)
+                            Log.d(TAG, "Reply successfully sent!")
                         } catch (e: Exception) {
-                            e.printStackTrace()
+                            Log.e(TAG, "Failed to send reply: ${e.message}")
                         }
                     }
+                } else {
+                    Log.e(TAG, "Could not find RemoteInput action in notification.")
                 }
             }
         }
     }
 
-    // We return a custom data class here to pass the reply text AND the delay rules
     data class ReplyResult(val replyText: String?, val delayMin: Int = 0, val delayMax: Int = 0)
 
     private suspend fun processIncomingMessage(sender: String, message: String): ReplyResult? {
@@ -169,6 +189,7 @@ class WhatsAppListenerService : NotificationListenerService() {
             }
             ReplyResult(RuleEngine.getReplyText(matchedRule, number = sender), matchedRule.delayMin, matchedRule.delayMax)
         } else {
+            Log.d(TAG, "No rule matched for this message.")
             null 
         }
     }
