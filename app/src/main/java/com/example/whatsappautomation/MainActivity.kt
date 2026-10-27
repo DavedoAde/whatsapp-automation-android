@@ -76,21 +76,21 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
     // --- BATTERY REMINDER DIALOG STATE ---
     val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
     var showBatteryDialog by remember { mutableStateOf(false) }
-    
-    // We use a flag to ensure it only checks when the app actually opens/resumes
-    var isFirstResume by remember { mutableStateOf(true) }
 
     // Check battery status when app opens/resumes
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                // Don't show the popup while on the welcome screen
+                // Only check if we are past the welcome screen
                 if (currentRoute != "welcome") {
                     val isOptimized = !powerManager.isIgnoringBatteryOptimizations(context.packageName)
-                    val isIgnored = PreferenceManager.isBatteryIgnored(context)
                     
-                    if (isOptimized && !isIgnored) {
+                    // If it is optimized (restricted), show the dialog. 
+                    // If it is unrestricted, hide the dialog.
+                    if (isOptimized) {
                         showBatteryDialog = true
+                    } else {
+                        showBatteryDialog = false
                     }
                 }
             }
@@ -111,7 +111,6 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
                         Switch(
                             checked = isAutomationActive,
                             onCheckedChange = { isChecked ->
-                                // FIXED: We just turn it on/off. No battery popup here.
                                 viewModel.toggleAutomation(isChecked)
                             },
                             modifier = Modifier.padding(end = 16.dp),
@@ -216,12 +215,12 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
         }
     }
 
-    // --- THE BATTERY REMINDER DIALOG ---
+    // --- THE STRICT BATTERY REMINDER DIALOG ---
     if (showBatteryDialog) {
         AlertDialog(
             onDismissRequest = { 
-                // If they tap outside the dialog, treat it as Ignore
-                PreferenceManager.setBatteryIgnored(context, true)
+                // Optional: If they tap outside, do nothing so it forces them to make a choice, 
+                // or you can just let it close. I'll let it close if they tap outside.
                 showBatteryDialog = false 
             },
             title = { Text("Battery Optimization is ON") },
@@ -244,17 +243,6 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
                     }
                 ) {
                     Text("Go to Settings")
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = {
-                        // Save preference so it never shows again
-                        PreferenceManager.setBatteryIgnored(context, true)
-                        showBatteryDialog = false
-                    }
-                ) {
-                    Text("Ignore", color = Color.Gray)
                 }
             }
         )
