@@ -9,11 +9,13 @@ import androidx.lifecycle.viewModelScope
 import com.example.whatsappautomation.data.AppDatabase
 import com.example.whatsappautomation.data.AutomationRule
 import com.example.whatsappautomation.data.Contact
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlin.random.Random
 
 class AppViewModel(application: Application) : AndroidViewModel(application) {
     
@@ -21,13 +23,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val contactDao = database.contactDao()
     private val ruleDao = database.ruleDao()
 
-    // FIXED: Read the saved state from preferences
     private val _isAutomationActive = MutableStateFlow(PreferenceManager.isAutomationActive(application))
     val isAutomationActive: StateFlow<Boolean> = _isAutomationActive
 
     fun toggleAutomation(isActive: Boolean) {
         _isAutomationActive.value = isActive
-        PreferenceManager.setAutomationActive(getApplication(), isActive) // FIXED: Save it!
+        PreferenceManager.setAutomationActive(getApplication(), isActive)
     }
 
     val activeRulesCount = ruleDao.getActiveRuleCount()
@@ -53,8 +54,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     private var currentSenderId = "+1234567890" 
 
-    fun simulateMessage(message: String): String {
-        // ... (Keep the simulation logic exactly as it is) ...
+    // Changed to suspend function
+    suspend fun simulateMessage(message: String): String {
         val allRulesList = allRules.value
         
         when (BotStateManager.currentLeadState) {
@@ -111,6 +112,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             val matchedChild = RuleEngine.findMatchingRule(message, childRules)
 
             if (matchedChild != null) {
+                // APPLY DELAY
+                if (matchedChild.delayMax > 0) {
+                    val min = matchedChild.delayMin
+                    val max = matchedChild.delayMax
+                    val randomDelaySeconds = if (max > min) Random.nextInt(min, max) else min
+                    delay(randomDelaySeconds * 1000L)
+                }
+
                 val hasSubMenu = allRulesList.any { it.parentRuleId == matchedChild.id }
                 BotStateManager.currentMenuId = if (hasSubMenu) matchedChild.id else null
                 
@@ -129,6 +138,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val matchedRule = RuleEngine.findMatchingRule(message, topLevelRules)
         
         return if (matchedRule != null) {
+            // APPLY DELAY
+            if (matchedRule.delayMax > 0) {
+                val min = matchedRule.delayMin
+                val max = matchedRule.delayMax
+                val randomDelaySeconds = if (max > min) Random.nextInt(min, max) else min
+                delay(randomDelaySeconds * 1000L)
+            }
+
             val hasSubMenu = allRulesList.any { it.parentRuleId == matchedRule.id }
             BotStateManager.currentMenuId = if (hasSubMenu) matchedRule.id else null
 
