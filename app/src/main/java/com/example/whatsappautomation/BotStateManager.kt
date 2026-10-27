@@ -2,6 +2,7 @@ package com.example.whatsappautomation
 
 import com.example.whatsappautomation.data.AutomationRule
 
+// This is the ONLY place LeadCaptureState is defined now
 enum class LeadCaptureState {
     IDLE,
     AWAITING_NAME,
@@ -13,8 +14,6 @@ object BotStateManager {
     var currentMenuId: Long? = null
     var tempName: String = ""
     var activeRule: AutomationRule? = null
-    
-    // Keeps track of senders currently in a lead capture flow
     var awaitingNameSender: String? = null 
 
     fun reset() {
