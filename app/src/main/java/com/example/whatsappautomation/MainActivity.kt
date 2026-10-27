@@ -42,7 +42,12 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
+    val context = LocalContext.current
     val navController = rememberNavController()
+    
+    // Determine starting route based on onboarding status
+    val startDestination = if (PreferenceManager.isFirstLaunch(context)) "welcome" else Screen.Dashboard.route
+
     val screens = listOf(
         Screen.Dashboard, 
         Screen.Rules,
@@ -60,15 +65,12 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
         Screen.Settings.route
     )
 
-    val context = LocalContext.current
     val isAutomationActive by viewModel.isAutomationActive.collectAsState()
     
     // --- PERMISSION STATE & LOGIC ---
     var showPermissionDialog by remember { mutableStateOf(false) }
+    val contactPermissionLauncher = rememberLauncherForActivityResult(contract = ActivityResultContracts.RequestPermission()) { }
     
-    val contactPermissionLauncher = rememberLauncherForActivityResult(contract = ActivityResultContracts.RequestPermission()) { /* Handle result if needed */ }
-    
-    // Check if Notification Access is granted
     fun hasNotificationAccess(): Boolean {
         val enabledListeners = NotificationManagerCompat.getEnabledListenerPackages(context)
         return enabledListeners.contains(context.packageName)
@@ -84,7 +86,6 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
                 TopAppBar(
                     title = { Text("WhatsApp Automation", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleLarge) },
                     actions = {
-                        // Master ON/OFF Switch with Permission Gate
                         Switch(
                             checked = isAutomationActive,
                             onCheckedChange = { isChecked ->
@@ -137,9 +138,20 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
     ) { innerPadding ->
         NavHost(
             navController = navController,
-            startDestination = Screen.Dashboard.route,
+            startDestination = startDestination,
             modifier = Modifier.padding(innerPadding)
         ) {
+            composable("welcome") {
+                WelcomeScreen(
+                    onGetStartedClick = {
+                        PreferenceManager.setFirstLaunchCompleted(context)
+                        navController.navigate(Screen.Dashboard.route) {
+                            popUpTo("welcome") { inclusive = true }
+                        }
+                    }
+                )
+            }
+            
             composable(Screen.Dashboard.route) { 
                 DashboardScreen(viewModel, onNavigateToSimulator = { navController.navigate("simulator") }) 
             }
@@ -189,19 +201,15 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
         }
     }
 
-    // --- THE POPUP DIALOG FOR MISSING PERMISSIONS ---
     if (showPermissionDialog) {
         AlertDialog(
             onDismissRequest = { showPermissionDialog = false },
             title = { Text("Permissions Required") },
-            text = { 
-                Text("To turn on the AutoResponder, you must grant Notification Access and Contact Access so the app can read messages and save leads.") 
-            },
+            text = { Text("To turn on the AutoResponder, you must grant Notification Access and Contact Access so the app can read messages and save leads.") },
             confirmButton = {
                 Button(
                     onClick = {
                         showPermissionDialog = false
-                        // Open Notification Settings first
                         val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
                         context.startActivity(intent)
                     }
@@ -213,7 +221,6 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
                 TextButton(
                     onClick = {
                         showPermissionDialog = false
-                        // Open Contact Permission Dialog
                         contactPermissionLauncher.launch(Manifest.permission.WRITE_CONTACTS)
                     }
                 ) {
@@ -224,7 +231,6 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
     }
 }
 
-// --- PREMIUM THEME COLORS ---
 @Composable
 fun WhatsAppAutomationTheme(content: @Composable () -> Unit) {
     val deepObsidian = Color(0xFF0B141A)  
