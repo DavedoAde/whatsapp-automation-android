@@ -1,9 +1,12 @@
 package com.example.whatsappautomation
 
 import android.Manifest
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Bundle
+import android.os.PowerManager
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -45,7 +48,6 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
     val context = LocalContext.current
     val navController = rememberNavController()
     
-    // Determine starting route based on onboarding status
     val startDestination = if (PreferenceManager.isFirstLaunch(context)) "welcome" else Screen.Dashboard.route
 
     val screens = listOf(
@@ -67,167 +69,153 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
 
     val isAutomationActive by viewModel.isAutomationActive.collectAsState()
     
-    // --- PERMISSION STATE & LOGIC ---
-    var showPermissionDialog by remember { mutableStateOf(false) }
-    val contactPermissionLauncher = rememberLauncherForActivityResult(contract = ActivityResultContracts.RequestPermission()) { }
+    // --- BATTERY REMINDER STATE ---
+    // Check if battery optimization is ignored
+    val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+    val isBatteryOptimized = !powerManager.isIgnoringBatteryOptimizations(context.packageName)
     
-    fun hasNotificationAccess(): Boolean {
-        val enabledListeners = NotificationManagerCompat.getEnabledListenerPackages(context)
-        return enabledListeners.contains(context.packageName)
+    // State to show the reminder screen. Defaults to true if optimized.
+    var showBatteryScreen by remember { mutableStateOf(isBatteryOptimized) }
+
+    // If the user granted optimization in settings and comes back, we hide the screen
+    LaunchedEffect(Unit) {
+        if (!isBatteryOptimized) {
+            showBatteryScreen = false
+        }
     }
 
-    fun hasContactAccess(): Boolean {
-        return ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_CONTACTS) == PackageManager.PERMISSION_GRANTED
-    }
-
-    Scaffold(
-        topBar = {
-            if (isMainScreen) {
-                TopAppBar(
-                    title = { Text("WhatsApp Automation", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleLarge) },
-                    actions = {
-                        Switch(
-                            checked = isAutomationActive,
-                            onCheckedChange = { isChecked ->
-                                if (isChecked) {
-                                    if (hasNotificationAccess() && hasContactAccess()) {
-                                        viewModel.toggleAutomation(true)
+    // If battery is still optimized, show the full screen reminder
+    if (showBatteryScreen) {
+        BatteryOptimizationScreen(
+            onBack = { showBatteryScreen = false } // Back arrow lets them temporarily bypass
+        )
+    } else {
+        // Otherwise, show the main app interface
+        Scaffold(
+            topBar = {
+                if (isMainScreen) {
+                    TopAppBar(
+                        title = { Text("WhatsApp Automation", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleLarge) },
+                        actions = {
+                            Switch(
+                                checked = isAutomationActive,
+                                onCheckedChange = { isChecked ->
+                                    if (isChecked) {
+                                        // Permission Gate Check
+                                        val hasNotif = NotificationManagerCompat.getEnabledListenerPackages(context).contains(context.packageName)
+                                        val hasContact = ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_CONTACTS) == PackageManager.PERMISSION_GRANTED
+                                        
+                                        if (hasNotif && hasContact && !isBatteryOptimized) {
+                                            viewModel.toggleAutomation(true)
+                                        } else {
+                                            // If they try to turn it on without permissions, show the warning again
+                                            showBatteryScreen = true
+                                        }
                                     } else {
-                                        showPermissionDialog = true
+                                        viewModel.toggleAutomation(false)
                                     }
-                                } else {
-                                    viewModel.toggleAutomation(false)
-                                }
-                            },
-                            modifier = Modifier.padding(end = 16.dp),
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = MaterialTheme.colorScheme.primary,
-                                checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+                                },
+                                modifier = Modifier.padding(end = 16.dp),
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = MaterialTheme.colorScheme.primary,
+                                    checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+                                )
                             )
-                        )
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
-                )
-            }
-        },
-        bottomBar = {
-            if (isMainScreen) {
-                NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
-                    screens.forEach { screen ->
-                        NavigationBarItem(
-                            icon = { Icon(screen.icon, contentDescription = screen.title) },
-                            label = { Text(screen.title) },
-                            selected = currentRoute == screen.route,
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = MaterialTheme.colorScheme.primary,
-                                selectedTextColor = MaterialTheme.colorScheme.primary,
-                                indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
-                            ),
-                            onClick = {
-                                navController.navigate(screen.route) {
-                                    popUpTo(navController.graph.startDestinationId) { saveState = true }
-                                    launchSingleTop = true
-                                    restoreState = true
-                                }
-                            }
-                        )
-                    }
-                }
-            }
-        }
-    ) { innerPadding ->
-        NavHost(
-            navController = navController,
-            startDestination = startDestination,
-            modifier = Modifier.padding(innerPadding)
-        ) {
-            composable("welcome") {
-                WelcomeScreen(
-                    onGetStartedClick = {
-                        PreferenceManager.setFirstLaunchCompleted(context)
-                        navController.navigate(Screen.Dashboard.route) {
-                            popUpTo("welcome") { inclusive = true }
-                        }
-                    }
-                )
-            }
-            
-            composable(Screen.Dashboard.route) { 
-                DashboardScreen(viewModel, onNavigateToSimulator = { navController.navigate("simulator") }) 
-            }
-            composable(Screen.Rules.route) { 
-                RulesScreen(
-                    viewModel = viewModel,
-                    onEditRule = { ruleId -> navController.navigate("rule_editor/$ruleId/0") }
-                ) 
-            }
-            composable(Screen.Contacts.route) { ContactsScreen(viewModel) }
-            composable(Screen.Settings.route) { SettingsScreen() }
-            
-            composable("simulator") { 
-                SimulatorScreen(viewModel, onBack = { navController.popBackStack() }) 
-            }
-
-            composable(
-                route = "rule_editor/{ruleId}/{parentId}",
-                arguments = listOf(
-                    navArgument("ruleId") { type = NavType.LongType },
-                    navArgument("parentId") { type = NavType.LongType }
-                )
-            ) { backStackEntry ->
-                val ruleId = backStackEntry.arguments?.getLong("ruleId") ?: 0L
-                val parentId = backStackEntry.arguments?.getLong("parentId") ?: 0L
-                
-                val existingRule = if (ruleId == 0L) null else viewModel.allRules.value.find { it.id == ruleId }
-                val childRules = viewModel.allRules.value.filter { it.parentRuleId == ruleId }
-                
-                RuleEditorScreen(
-                    existingRule = existingRule,
-                    parentId = if (parentId == 0L) null else parentId,
-                    childRules = childRules,
-                    onBack = { navController.popBackStack() },
-                    onSave = { updatedRule ->
-                        viewModel.saveRule(updatedRule)
-                        navController.popBackStack()
-                    },
-                    onAddChildRule = { parentRuleId ->
-                        navController.navigate("rule_editor/0/$parentRuleId")
-                    },
-                    onEditChildRule = { childId ->
-                        navController.navigate("rule_editor/$childId/0") 
-                    }
-                )
-            }
-        }
-    }
-
-    if (showPermissionDialog) {
-        AlertDialog(
-            onDismissRequest = { showPermissionDialog = false },
-            title = { Text("Permissions Required") },
-            text = { Text("To turn on the AutoResponder, you must grant Notification Access and Contact Access so the app can read messages and save leads.") },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        showPermissionDialog = false
-                        val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
-                        context.startActivity(intent)
-                    }
-                ) {
-                    Text("Grant Notification Access")
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
+                    )
                 }
             },
-            dismissButton = {
-                TextButton(
-                    onClick = {
-                        showPermissionDialog = false
-                        contactPermissionLauncher.launch(Manifest.permission.WRITE_CONTACTS)
+            bottomBar = {
+                if (isMainScreen) {
+                    NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
+                        screens.forEach { screen ->
+                            NavigationBarItem(
+                                icon = { Icon(screen.icon, contentDescription = screen.title) },
+                                label = { Text(screen.title) },
+                                selected = currentRoute == screen.route,
+                                colors = NavigationBarItemDefaults.colors(
+                                    selectedIconColor = MaterialTheme.colorScheme.primary,
+                                    selectedTextColor = MaterialTheme.colorScheme.primary,
+                                    indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                                ),
+                                onClick = {
+                                    navController.navigate(screen.route) {
+                                        popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
+                                }
+                            )
+                        }
                     }
-                ) {
-                    Text("Grant Contact Access")
                 }
             }
-        )
+        ) { innerPadding ->
+            NavHost(
+                navController = navController,
+                startDestination = startDestination,
+                modifier = Modifier.padding(innerPadding)
+            ) {
+                composable("welcome") {
+                    WelcomeScreen(
+                        onGetStartedClick = {
+                            PreferenceManager.setFirstLaunchCompleted(context)
+                            navController.navigate(Screen.Dashboard.route) {
+                                popUpTo("welcome") { inclusive = true }
+                            }
+                        }
+                    )
+                }
+                
+                composable(Screen.Dashboard.route) { 
+                    DashboardScreen(viewModel, onNavigateToSimulator = { navController.navigate("simulator") }) 
+                }
+                composable(Screen.Rules.route) { 
+                    RulesScreen(
+                        viewModel = viewModel,
+                        onEditRule = { ruleId -> navController.navigate("rule_editor/$ruleId/0") }
+                    ) 
+                }
+                composable(Screen.Contacts.route) { ContactsScreen(viewModel) }
+                composable(Screen.Settings.route) { SettingsScreen() }
+                
+                composable("simulator") { 
+                    SimulatorScreen(viewModel, onBack = { navController.popBackStack() }) 
+                }
+
+                composable(
+                    route = "rule_editor/{ruleId}/{parentId}",
+                    arguments = listOf(
+                        navArgument("ruleId") { type = NavType.LongType },
+                        navArgument("parentId") { type = NavType.LongType }
+                    )
+                ) { backStackEntry ->
+                    val ruleId = backStackEntry.arguments?.getLong("ruleId") ?: 0L
+                    val parentId = backStackEntry.arguments?.getLong("parentId") ?: 0L
+                    
+                    val existingRule = if (ruleId == 0L) null else viewModel.allRules.value.find { it.id == ruleId }
+                    val childRules = viewModel.allRules.value.filter { it.parentRuleId == ruleId }
+                    
+                    RuleEditorScreen(
+                        existingRule = existingRule,
+                        parentId = if (parentId == 0L) null else parentId,
+                        childRules = childRules,
+                        onBack = { navController.popBackStack() },
+                        onSave = { updatedRule ->
+                            viewModel.saveRule(updatedRule)
+                            navController.popBackStack()
+                        },
+                        onAddChildRule = { parentRuleId ->
+                            navController.navigate("rule_editor/0/$parentRuleId")
+                        },
+                        onEditChildRule = { childId ->
+                            navController.navigate("rule_editor/$childId/0") 
+                        }
+                    )
+                }
+            }
+        }
     }
 }
 
