@@ -21,7 +21,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val contactDao = database.contactDao()
     private val ruleDao = database.ruleDao()
 
-    private val _isAutomationActive = MutableStateFlow(true)
+    // FIXED: Defaults to false on fresh install
+    private val _isAutomationActive = MutableStateFlow(false) 
     val isAutomationActive: StateFlow<Boolean> = _isAutomationActive
 
     fun toggleAutomation(isActive: Boolean) {
@@ -43,8 +44,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun deleteRule(rule: AutomationRule) {
         viewModelScope.launch { ruleDao.deleteRuleById(rule.id) }
     }
-    
-    // NEW: Toggle rule directly from list
     fun toggleRuleActiveState(rule: AutomationRule) {
         viewModelScope.launch {
             ruleDao.insertRule(rule.copy(isActive = !rule.isActive))
