@@ -32,41 +32,23 @@ fun DashboardScreen(viewModel: AppViewModel, onNavigateToSimulator: () -> Unit) 
     
     val context = LocalContext.current
     var hasContactPermission by remember {
-        mutableStateOf(
-            ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_CONTACTS) == PackageManager.PERMISSION_GRANTED
-        )
+        mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_CONTACTS) == PackageManager.PERMISSION_GRANTED)
     }
 
-    val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
+    val permissionLauncher = rememberLauncherForActivityResult(contract = ActivityResultContracts.RequestPermission()) { isGranted ->
         hasContactPermission = isGranted
     }
 
-    Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
+    Column(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text("Dashboard", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
         
         Card(modifier = Modifier.fillMaxWidth()) {
-            Row(
-                modifier = Modifier.padding(16.dp).fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Column {
-                    Text(
-                        text = if (isAutomationActive) "Automation is ON" else "Automation is OFF", 
-                        fontWeight = FontWeight.Bold, 
-                        color = if (isAutomationActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
-                    )
+                    Text(text = if (isAutomationActive) "Automation is ON" else "Automation is OFF", fontWeight = FontWeight.Bold, color = if (isAutomationActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
                     Text("Monitoring WhatsApp", fontSize = 12.sp)
                 }
-                Switch(
-                    checked = isAutomationActive, 
-                    onCheckedChange = { viewModel.toggleAutomation(it) }
-                )
+                Switch(checked = isAutomationActive, onCheckedChange = { viewModel.toggleAutomation(it) })
             }
         }
 
@@ -86,18 +68,12 @@ fun DashboardScreen(viewModel: AppViewModel, onNavigateToSimulator: () -> Unit) 
         }
 
         if (!hasContactPermission) {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
-            ) {
+            Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text("Permission Required", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onErrorContainer)
                     Text("Grant contact access to automatically save new leads to your phone's address book.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onErrorContainer)
                     Spacer(modifier = Modifier.height(8.dp))
-                    Button(
-                        onClick = { permissionLauncher.launch(Manifest.permission.WRITE_CONTACTS) },
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                    ) {
+                    Button(onClick = { permissionLauncher.launch(Manifest.permission.WRITE_CONTACTS) }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) {
                         Text("Grant Permission")
                     }
                 }
@@ -105,7 +81,6 @@ fun DashboardScreen(viewModel: AppViewModel, onNavigateToSimulator: () -> Unit) 
         }
 
         Spacer(modifier = Modifier.height(16.dp))
-
         Button(onClick = onNavigateToSimulator, modifier = Modifier.fillMaxWidth()) {
             Text("Open Chat Simulator")
         }
@@ -118,16 +93,9 @@ fun ContactsScreen(viewModel: AppViewModel) {
 
     Box(modifier = Modifier.fillMaxSize()) {
         if (contacts.isEmpty()) {
-            Text(
-                "No contacts captured yet.\nUse the Simulator to test the flow.", 
-                modifier = Modifier.align(Alignment.Center),
-                fontSize = 16.sp
-            )
+            Text("No contacts captured yet.\nUse the Simulator to test the flow.", modifier = Modifier.align(Alignment.Center), fontSize = 16.sp)
         } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
+            LazyColumn(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(contacts) { contact ->
                     ContactCard(contact)
                 }
@@ -139,27 +107,26 @@ fun ContactsScreen(viewModel: AppViewModel) {
 @Composable
 fun ContactCard(contact: Contact) {
     Card(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.padding(16.dp).fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Surface(
-                shape = MaterialTheme.shapes.medium,
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
-                modifier = Modifier.size(48.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Person,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(8.dp)
-                )
+        Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f), modifier = Modifier.size(48.dp)) {
+                Icon(imageVector = Icons.Default.Person, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(8.dp))
             }
             Spacer(modifier = Modifier.width(16.dp))
-            Column {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(contact.name, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.onSurface)
                 Text("Phone: ${contact.phoneNumber}", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
-                Text("Source: ${contact.sourceApp}", fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
+                
+                if (contact.tags.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Surface(shape = MaterialTheme.shapes.small, color = MaterialTheme.colorScheme.tertiary) {
+                        Text(
+                            text = contact.tags, 
+                            fontSize = 10.sp, 
+                            color = MaterialTheme.colorScheme.onTertiary, 
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                        )
+                    }
+                }
             }
         }
     }
@@ -169,36 +136,20 @@ fun ContactCard(contact: Contact) {
 fun RulesScreen(viewModel: AppViewModel, onEditRule: (Long) -> Unit) {
     val allRules by viewModel.allRules.collectAsState()
     val topLevelRules = allRules.filter { it.parentRuleId == null }
-    
     var ruleToDelete by remember { mutableStateOf<AutomationRule?>(null) }
 
     Box(modifier = Modifier.fillMaxSize()) {
         if (topLevelRules.isEmpty()) {
-            Text(
-                "No rules created yet.\nTap + to add one.", 
-                modifier = Modifier.align(Alignment.Center),
-                fontSize = 16.sp
-            )
+            Text("No rules created yet.\nTap + to add one.", modifier = Modifier.align(Alignment.Center), fontSize = 16.sp)
         } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
+            LazyColumn(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(topLevelRules) { rule ->
-                    RuleCard(
-                        rule = rule,
-                        onEditClick = { onEditRule(rule.id) },
-                        onDeleteClick = { ruleToDelete = rule }
-                    )
+                    RuleCard(rule = rule, onEditClick = { onEditRule(rule.id) }, onDeleteClick = { ruleToDelete = rule })
                 }
             }
         }
 
-        FloatingActionButton(
-            onClick = { onEditRule(0L) },
-            modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
-            containerColor = MaterialTheme.colorScheme.primary
-        ) {
+        FloatingActionButton(onClick = { onEditRule(0L) }, modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp), containerColor = MaterialTheme.colorScheme.primary) {
             Icon(Icons.Default.Add, contentDescription = "Add Rule")
         }
     }
@@ -209,19 +160,9 @@ fun RulesScreen(viewModel: AppViewModel, onEditRule: (Long) -> Unit) {
             title = { Text("Delete Rule?") },
             text = { Text("Are you sure you want to delete '${ruleToDelete?.name}'?") },
             confirmButton = {
-                TextButton(
-                    onClick = {
-                        viewModel.deleteRule(ruleToDelete!!)
-                        ruleToDelete = null
-                    },
-                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                ) {
-                    Text("Delete")
-                }
+                TextButton(onClick = { viewModel.deleteRule(ruleToDelete!!); ruleToDelete = null }, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Delete") }
             },
-            dismissButton = {
-                TextButton(onClick = { ruleToDelete = null }) { Text("Cancel") }
-            }
+            dismissButton = { TextButton(onClick = { ruleToDelete = null }) { Text("Cancel") } }
         )
     }
 }
@@ -229,32 +170,20 @@ fun RulesScreen(viewModel: AppViewModel, onEditRule: (Long) -> Unit) {
 @Composable
 fun RuleCard(rule: AutomationRule, onEditClick: () -> Unit, onDeleteClick: () -> Unit) {
     Card(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.padding(16.dp).fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(rule.name, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.primary)
-                
-                // FIXED: Changed rule.actionType to rule.askForName
-                Text(
-                    text = if (rule.askForName) "Save Lead: ON" else "Standard Reply", 
-                    fontSize = 12.sp, 
-                    color = if (rule.askForName) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
-                )
-                
+                Text(text = if (rule.askForName) "Lead Capture: ON" else "Standard Reply", fontSize = 12.sp, color = if (rule.askForName) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary.copy(alpha = 0.7f))
+                if (rule.assignTag.isNotBlank()) {
+                    Text("Tag: ${rule.assignTag}", fontSize = 12.sp, color = MaterialTheme.colorScheme.tertiary)
+                }
                 Text("Match: ${rule.matchType}", fontSize = 12.sp, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f))
                 Spacer(modifier = Modifier.height(4.dp))
                 Text("Trigger: '${rule.triggerKeyword}'", fontSize = 14.sp)
             }
             Row {
-                IconButton(onClick = onEditClick) {
-                    Icon(Icons.Default.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.primary)
-                }
-                IconButton(onClick = onDeleteClick) {
-                    Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
-                }
+                IconButton(onClick = onEditClick) { Icon(Icons.Default.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.primary) }
+                IconButton(onClick = onDeleteClick) { Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error) }
             }
         }
     }
