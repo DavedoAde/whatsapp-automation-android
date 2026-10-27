@@ -5,6 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.PowerManager
 import android.provider.Settings
+import androidx.compose.foundation.BorderStroke // <--- ADDED THIS IMPORT
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -30,9 +31,6 @@ import com.example.whatsappautomation.data.AutomationRule
 import com.example.whatsappautomation.data.Contact
 
 // --- NEW: BATTERY OPTIMIZATION SCREEN ---
-
-// ... (Imports remain the same) ...
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BatteryOptimizationScreen(onBack: () -> Unit, onRetry: () -> Unit) {
@@ -114,7 +112,6 @@ fun BatteryOptimizationScreen(onBack: () -> Unit, onRetry: () -> Unit) {
 
             Spacer(modifier = Modifier.height(32.dp))
             
-            // NEW: Retry button for manual check
             OutlinedButton(
                 onClick = onRetry,
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
@@ -147,7 +144,6 @@ fun BatteryOptimizationScreen(onBack: () -> Unit, onRetry: () -> Unit) {
     }
 }
 
-// ... (Rest of Screens.kt remains the same) ...
 // --- DASHBOARD ---
 @Composable
 fun DashboardScreen(viewModel: AppViewModel, onNavigateToSimulator: () -> Unit) {
