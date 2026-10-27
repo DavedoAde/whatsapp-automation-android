@@ -4,17 +4,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -23,7 +19,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.whatsappautomation.data.AutomationRule
@@ -42,13 +37,15 @@ fun RuleEditorScreen(
     var trigger by rememberSaveable(existingRule?.id) { mutableStateOf(existingRule?.triggerKeyword ?: "") }
     var matchType by rememberSaveable(existingRule?.id) { mutableStateOf(existingRule?.matchType ?: "SIMILARITY") }
     var targetChat by rememberSaveable(existingRule?.id) { mutableStateOf(existingRule?.targetChat ?: "ALL") }
-    
     var replyMode by rememberSaveable(existingRule?.id) { mutableStateOf(existingRule?.replyMode ?: "SINGLE") }
     
     // Save Lead State
     var askForName by rememberSaveable(existingRule?.id) { mutableStateOf(existingRule?.askForName ?: false) }
     var promptQuestion by rememberSaveable(existingRule?.id) { mutableStateOf(existingRule?.promptQuestion ?: "What's your name?") }
-    var thankYouReply by rememberSaveable(existingRule?.id) { mutableStateOf(existingRule?.thankYouReply ?: "Nice to meet you, {name}!") }
+    var confirmQuestion by rememberSaveable(existingRule?.id) { mutableStateOf(existingRule?.confirmQuestion ?: "Is your name {name}? Reply YES or NO.") }
+    var retryQuestion by rememberSaveable(existingRule?.id) { mutableStateOf(existingRule?.retryQuestion ?: "No problem. What's your name again?") }
+    var successMessage by rememberSaveable(existingRule?.id) { mutableStateOf(existingRule?.successMessage ?: "Thank you {name}! Your details have been saved.") }
+    var assignTag by rememberSaveable(existingRule?.id) { mutableStateOf(existingRule?.assignTag ?: "") }
     
     // Conditions
     var screenOff by rememberSaveable(existingRule?.id) { mutableStateOf(existingRule?.requireScreenOff ?: false) }
@@ -64,23 +61,21 @@ fun RuleEditorScreen(
         }
     }
 
-    var showInfoDialog by remember { mutableStateOf<String?>(null) }
     var showTargetMenu by remember { mutableStateOf(false) }
     var showValidationError by remember { mutableStateOf(false) }
-    
     val scrollState = rememberScrollState()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // Helper to insert variables into the text field
-    fun insertVariable(varName: String, isThankYou: Boolean = false) {
-        if (isThankYou) {
-            thankYouReply += " {$varName}"
+    fun insertVariable(varName: String, isLeadField: Boolean = false) {
+        if (isLeadField) {
+            successMessage += " {$varName}"
         } else {
-            if (replies.isNotEmpty()) {
-                replies[replies.size - 1] += " {$varName}"
-            }
+            if (replies.isNotEmpty()) replies[replies.size - 1] += " {$varName}"
         }
     }
+
+    // Validation: Trigger is required. Either a standard reply OR askForName is required.
+    val canSave = trigger.isNotBlank() && (askForName || replies.any { it.isNotBlank() })
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -96,14 +91,9 @@ fun RuleEditorScreen(
             )
         },
         floatingActionButton = {
-            // Floating Green Checkmark Button
             FloatingActionButton(
                 onClick = {
-                    if (trigger.isBlank() && matchType != "WELCOME") {
-                        showValidationError = true
-                    } else if (replies.all { it.isBlank() }) {
-                        showValidationError = true
-                    } else {
+                    if (canSave) {
                         val combinedReplies = replies.filter { it.isNotBlank() }.joinToString("|")
                         val finalName = if (trigger.isBlank()) "Welcome Message" else trigger
                         
@@ -116,7 +106,10 @@ fun RuleEditorScreen(
                             replyMode = replyMode,
                             askForName = askForName,
                             promptQuestion = promptQuestion,
-                            thankYouReply = thankYouReply,
+                            confirmQuestion = confirmQuestion,
+                            retryQuestion = retryQuestion,
+                            successMessage = successMessage,
+                            assignTag = assignTag,
                             requireScreenOff = screenOff,
                             requireCharging = charging,
                             requireDnd = dnd
@@ -129,18 +122,23 @@ fun RuleEditorScreen(
                             replyMode = replyMode,
                             askForName = askForName,
                             promptQuestion = promptQuestion,
-                            thankYouReply = thankYouReply,
+                            confirmQuestion = confirmQuestion,
+                            retryQuestion = retryQuestion,
+                            successMessage = successMessage,
+                            assignTag = assignTag,
                             requireScreenOff = screenOff,
                             requireCharging = charging,
                             requireDnd = dnd,
                             parentRuleId = parentId
                         )
                         onSave(newRule)
+                    } else {
+                        showValidationError = true
                     }
                 },
-                containerColor = MaterialTheme.colorScheme.primary
+                containerColor = if (canSave) MaterialTheme.colorScheme.primary else Color.Gray
             ) {
-                Icon(Icons.Default.Check, contentDescription = "Save Rule", tint = MaterialTheme.colorScheme.onPrimary)
+                Icon(Icons.Default.Check, contentDescription = "Save Rule", tint = Color.White)
             }
         }
     ) { padding ->
@@ -162,8 +160,16 @@ fun RuleEditorScreen(
                         modifier = Modifier.weight(1f)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
+                    // ALL (*) Button
+                    Button(
+                        onClick = { trigger = "*"; matchType = "EXACT" }, 
+                        colors = ButtonDefaults.buttonColors(containerColor = if (trigger == "*") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface)
+                    ) {
+                        Text("ALL (*)")
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
                     Box {
-                        Button(onClick = { showTargetMenu = true }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)) {
+                        Button(onClick = { showTargetMenu = true }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)) {
                             Text(if (targetChat == "ALL") "ALL" else if (targetChat == "INDIVIDUALS") "Indiv." else if (targetChat == "GROUPS") "Groups" else "Specific")
                         }
                         DropdownMenu(expanded = showTargetMenu, onDismissRequest = { showTargetMenu = false }) {
@@ -186,16 +192,8 @@ fun RuleEditorScreen(
             // CARD 2 & 3: Automatic Reply & Multiple Replies
             EditorCard(title = "Automatic reply") {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    // Variable insertion buttons
-                    AssistChip(
-                        onClick = { insertVariable("name") },
-                        label = { Text("{name}", fontSize = 10.sp) },
-                        modifier = Modifier.padding(end = 4.dp)
-                    )
-                    AssistChip(
-                        onClick = { insertVariable("number") },
-                        label = { Text("{number}", fontSize = 10.sp) }
-                    )
+                    AssistChip(onClick = { insertVariable("name") }, label = { Text("{name}", fontSize = 10.sp) }, modifier = Modifier.padding(end = 4.dp))
+                    AssistChip(onClick = { insertVariable("number") }, label = { Text("{number}", fontSize = 10.sp) })
                 }
                 Spacer(modifier = Modifier.height(4.dp))
                 
@@ -218,11 +216,11 @@ fun RuleEditorScreen(
                         RadioButton(selected = replyMode == "SINGLE", onClick = { replyMode = "SINGLE" })
                         Text("1")
                     }
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { replyMode == "ALL" }) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { replyMode = "ALL" }) {
                         RadioButton(selected = replyMode == "ALL", onClick = { replyMode = "ALL" })
                         Text("All")
                     }
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { replyMode == "RANDOM" }) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { replyMode = "RANDOM" }) {
                         RadioButton(selected = replyMode == "RANDOM", onClick = { replyMode = "RANDOM" })
                         Text("Random")
                     }
@@ -244,25 +242,21 @@ fun RuleEditorScreen(
                 }
                 
                 if (askForName) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedTextField(value = promptQuestion, onValueChange = { promptQuestion = it }, label = { Text("Question to ask name") }, modifier = Modifier.fillMaxWidth())
                     Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = promptQuestion,
-                        onValueChange = { promptQuestion = it },
-                        label = { Text("Question to ask") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                    OutlinedTextField(value = confirmQuestion, onValueChange = { confirmQuestion = it }, label = { Text("Confirmation (YES/NO)") }, modifier = Modifier.fillMaxWidth())
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(value = retryQuestion, onValueChange = { retryQuestion = it }, label = { Text("Retry if NO") }, modifier = Modifier.fillMaxWidth())
                     Spacer(modifier = Modifier.height(8.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        OutlinedTextField(
-                            value = thankYouReply,
-                            onValueChange = { thankYouReply = it },
-                            label = { Text("Thank-you reply") },
-                            modifier = Modifier.weight(1f)
-                        )
-                        IconButton(onClick = { insertVariable("name", isThankYou = true) }) {
+                        OutlinedTextField(value = successMessage, onValueChange = { successMessage = it }, label = { Text("Success Message") }, modifier = Modifier.weight(1f))
+                        IconButton(onClick = { insertVariable("name", isLeadField = true) }) {
                             Icon(Icons.Default.Add, contentDescription = "Insert {name}")
                         }
                     }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(value = assignTag, onValueChange = { assignTag = it }, label = { Text("Assign Tag (e.g. TikTok, Facebook)") }, modifier = Modifier.fillMaxWidth())
                 }
             }
 
@@ -273,22 +267,17 @@ fun RuleEditorScreen(
                 ConditionSwitchRow("Only reply if Do Not Disturb is on", dnd) { dnd = it }
             }
 
-            // SECTION 6: SUBMENU (If existing rule)
+            // SECTION 6: SUBMENU
             if (existingRule != null) {
                 EditorCard(title = "Submenu / Conversation Flow") {
-                    Text("Rules added here will only trigger if the contact is currently inside this menu.", fontSize = 12.sp)
+                    Text("Rules added here will trigger after the contact is saved, or if they choose an option.", fontSize = 12.sp)
                     Spacer(modifier = Modifier.height(8.dp))
-                    
                     childRules.forEach { child ->
                         Card(
                             modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f))
                         ) {
-                            Row(
-                                modifier = Modifier.padding(12.dp).fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
+                            Row(modifier = Modifier.padding(12.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                                 Column {
                                     Text(child.name, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                                     Text("Trigger: ${child.triggerKeyword}", fontSize = 12.sp)
@@ -299,7 +288,6 @@ fun RuleEditorScreen(
                             }
                         }
                     }
-                    
                     Spacer(modifier = Modifier.height(8.dp))
                     Button(onClick = { onAddChildRule(existingRule.id) }, modifier = Modifier.fillMaxWidth()) {
                         Icon(Icons.Default.Add, contentDescription = "Add Submenu Rule")
@@ -309,26 +297,13 @@ fun RuleEditorScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(80.dp)) // Padding for FAB
+            Spacer(modifier = Modifier.height(80.dp)) 
         }
     }
 
-    // Info Dialog Handler
-    showInfoDialog?.let { type ->
-        AlertDialog(
-            onDismissRequest = { showInfoDialog = null },
-            title = { Text(type) },
-            text = { Text(getInfoText(type)) },
-            confirmButton = {
-                TextButton(onClick = { showInfoDialog = null }) { Text("OK") }
-            }
-        )
-    }
-
-    // Validation Error Snackbar
     LaunchedEffect(showValidationError) {
         if (showValidationError) {
-            snackbarHostState.showSnackbar("Please enter a trigger and at least one reply message.")
+            snackbarHostState.showSnackbar("Please fill in the trigger and a reply (or turn on Save Lead).")
             showValidationError = false
         }
     }
@@ -367,10 +342,7 @@ fun ConditionSwitchRow(title: String, checked: Boolean, onCheckedChange: (Boolea
 
 @Composable
 fun EditorCard(title: String, titleColor: Color = MaterialTheme.colorScheme.primary, content: @Composable ColumnScope.() -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-    ) {
+    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(text = title, fontWeight = FontWeight.Bold, color = titleColor, fontSize = 18.sp)
             Spacer(modifier = Modifier.height(12.dp))
