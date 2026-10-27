@@ -24,13 +24,20 @@ class WhatsAppListenerService : NotificationListenerService() {
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         val packageName = sbn.packageName
+        
+        // 1. Check for WhatsApp packages
         if (packageName != "com.whatsapp" && packageName != "com.whatsapp.w4b") return
+        
+        // 2. Ignore group summaries and ongoing events
         if ((sbn.notification.flags and Notification.FLAG_GROUP_SUMMARY) != 0) return
         if ((sbn.notification.flags and Notification.FLAG_ONGOING_EVENT) != 0) return
 
         val extras = sbn.notification.extras
         val senderName = extras.getString(Notification.EXTRA_TITLE) ?: "Unknown"
         
+        // 3. Ignore notifications if the sender is yourself ("Me", "You")
+        if (senderName.equals("Me", ignoreCase = true) || senderName.equals("You", ignoreCase = true)) return
+
         var messageText = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: ""
         if (messageText.isBlank()) {
             val textLines = extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)
@@ -40,6 +47,23 @@ class WhatsAppListenerService : NotificationListenerService() {
         }
 
         if (messageText.isBlank()) return
+        
+        // 4. Timestamp guard to prevent reading duplicate notifications
+        val notificationTime = sbn.postTime
+        if (notificationTime <= BotStateManager.lastNotificationTime) return
+        BotStateManager.lastNotificationTime = notificationTime
+
+        // 5. DEDUPLICATION: Ignore if we just sent this exact message to this sender
+        val messageKey = "$senderName:$messageText"
+        if (BotStateManager.recentlySentMessages.contains(messageKey)) {
+            return 
+        }
+
+        // 6. COOLDOWN: Ignore if we replied to this sender in the last 3 seconds
+        val lastReply = BotStateManager.lastReplyTimeMap[senderName] ?: 0L
+        if (System.currentTimeMillis() - lastReply < 3000) {
+            return
+        }
 
         scope.launch {
             val replyText = processIncomingMessage(senderName, messageText)
@@ -58,6 +82,8 @@ class WhatsAppListenerService : NotificationListenerService() {
                     withContext(Dispatchers.Main) {
                         try {
                             remoteInputAction.actionIntent.send(applicationContext, 0, intent)
+                            // Record the sent message to prevent the loop
+                            BotStateManager.recordSentMessage(senderName, replyText)
                         } catch (e: Exception) {
                             e.printStackTrace()
                         }
@@ -71,7 +97,6 @@ class WhatsAppListenerService : NotificationListenerService() {
         val ruleDao = database.ruleDao()
         val contactDao = database.contactDao()
         
-        // 1. Handle Lead Capture State Machine
         when (BotStateManager.currentLeadState) {
             LeadCaptureState.AWAITING_NAME -> {
                 if (BotStateManager.awaitingNameSender == sender) {
@@ -119,8 +144,7 @@ class WhatsAppListenerService : NotificationListenerService() {
             LeadCaptureState.IDLE -> { /* Proceed */ }
         }
 
-        // 2. Normal Rule Matching
-        val allRules = ruleDao.getAllRulesSync() // FIXED: Used getAllRulesSync()
+        val allRules = ruleDao.getAllRulesSync()
         val topLevelRules = allRules.filter { it.parentRuleId == null && it.isActive }
         
         val matchedRule = RuleEngine.findMatchingRule(message, topLevelRules)
@@ -134,7 +158,7 @@ class WhatsAppListenerService : NotificationListenerService() {
             }
             RuleEngine.getReplyText(matchedRule, number = sender)
         } else {
-            null // Stay silent
+            null
         }
     }
 }
