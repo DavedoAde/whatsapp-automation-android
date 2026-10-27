@@ -15,6 +15,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
@@ -102,23 +103,19 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                // 1. Re-check permissions
                 hasNotifAccess = checkNotificationAccess(context)
                 hasContactAccess = checkContactAccess(context)
 
-                // 2. Finish turning on automation if permissions are now granted
                 if (isTurningOnAutomation && hasNotifAccess && hasContactAccess) {
                     viewModel.toggleAutomation(true)
                     showPermissionDialog = false
                     isTurningOnAutomation = false
                     
-                    // NOW check if we should show the battery dialog immediately after
                     val isOptimized = !powerManager.isIgnoringBatteryOptimizations(context.packageName)
                     if (isOptimized && !PreferenceManager.isBatteryIgnored(context)) {
                         showBatteryDialog = true
                     }
                 } 
-                // 3. If NOT currently in the permission flow, check battery status normally
                 else if (!showPermissionDialog && currentRoute != "welcome") {
                     val isOptimized = !powerManager.isIgnoringBatteryOptimizations(context.packageName)
                     if (isOptimized && !PreferenceManager.isBatteryIgnored(context) && !PreferenceManager.isFirstLaunch(context)) {
@@ -141,13 +138,22 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
                 TopAppBar(
                     title = { Text("WhatsApp Automation", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleLarge) },
                     actions = {
+                        // Chat Simulator Icon
+                        IconButton(onClick = { navController.navigate("simulator") }) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.Chat, 
+                                contentDescription = "Simulator",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        
+                        // Master ON/OFF Switch
                         Switch(
                             checked = isAutomationActive,
                             onCheckedChange = { isChecked ->
                                 if (isChecked) {
                                     if (hasNotifAccess && hasContactAccess) {
                                         viewModel.toggleAutomation(true)
-                                        // Check battery right away
                                         val isOptimized = !powerManager.isIgnoringBatteryOptimizations(context.packageName)
                                         if (isOptimized && !PreferenceManager.isBatteryIgnored(context)) {
                                             showBatteryDialog = true
@@ -215,7 +221,7 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
             }
             
             composable(Screen.Dashboard.route) { 
-                DashboardScreen(viewModel, onNavigateToSimulator = { navController.navigate("simulator") }) 
+                DashboardScreen(viewModel) 
             }
             composable(Screen.Rules.route) { 
                 RulesScreen(
@@ -314,7 +320,6 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
                         showPermissionDialog = false
                         isTurningOnAutomation = false
                         
-                        // Check battery right after
                         val isOptimized = !powerManager.isIgnoringBatteryOptimizations(context.packageName)
                         if (isOptimized && !PreferenceManager.isBatteryIgnored(context)) {
                             showBatteryDialog = true
@@ -334,7 +339,7 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
         )
     }
 
-    // --- BATTERY DIALOG (with Ignore) ---
+    // --- BATTERY DIALOG ---
     if (showBatteryDialog) {
         AlertDialog(
             onDismissRequest = { showBatteryDialog = false },
