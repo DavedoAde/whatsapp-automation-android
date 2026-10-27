@@ -21,12 +21,13 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val contactDao = database.contactDao()
     private val ruleDao = database.ruleDao()
 
-    // FIXED: Defaults to false on fresh install
-    private val _isAutomationActive = MutableStateFlow(false) 
+    // FIXED: Read the saved state from preferences
+    private val _isAutomationActive = MutableStateFlow(PreferenceManager.isAutomationActive(application))
     val isAutomationActive: StateFlow<Boolean> = _isAutomationActive
 
     fun toggleAutomation(isActive: Boolean) {
         _isAutomationActive.value = isActive
+        PreferenceManager.setAutomationActive(getApplication(), isActive) // FIXED: Save it!
     }
 
     val activeRulesCount = ruleDao.getActiveRuleCount()
@@ -53,6 +54,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private var currentSenderId = "+1234567890" 
 
     fun simulateMessage(message: String): String {
+        // ... (Keep the simulation logic exactly as it is) ...
         val allRulesList = allRules.value
         
         when (BotStateManager.currentLeadState) {
