@@ -26,6 +26,45 @@ import androidx.core.content.ContextCompat
 import com.example.whatsappautomation.data.AutomationRule
 import com.example.whatsappautomation.data.Contact
 
+// --- NEW SETTINGS SCREEN ---
+@Composable
+fun SettingsScreen() {
+    var enableOriginalWA by remember { mutableStateOf(true) }
+    var enableWABusiness by remember { mutableStateOf(true) }
+    var enableMultiUser by remember { mutableStateOf(false) }
+
+    Column(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Text("Settings", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+        
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("Version of WA", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Spacer(modifier = Modifier.height(8.dp))
+                SwitchRow("WhatsApp (Original)", enableOriginalWA) { enableOriginalWA = it }
+                SwitchRow("WhatsApp Business", enableWABusiness) { enableWABusiness = it }
+            }
+        }
+
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("Multi-User Support", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Text("Reply to WA versions of other users on this device (Dual App).", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                Spacer(modifier = Modifier.height(8.dp))
+                SwitchRow("Enable Multi-User", enableMultiUser) { enableMultiUser = it }
+            }
+        }
+    }
+}
+
+@Composable
+fun SwitchRow(title: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(title, fontSize = 14.sp)
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
+    }
+}
+
+// --- DASHBOARD ---
 @Composable
 fun DashboardScreen(viewModel: AppViewModel, onNavigateToSimulator: () -> Unit) {
     val isAutomationActive by viewModel.isAutomationActive.collectAsState()
@@ -69,7 +108,6 @@ fun DashboardScreen(viewModel: AppViewModel, onNavigateToSimulator: () -> Unit) 
             }
         }
 
-        // Permissions Checklist
         if (!hasContactPermission) {
             Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
                 Column(modifier = Modifier.padding(16.dp)) {
@@ -83,11 +121,10 @@ fun DashboardScreen(viewModel: AppViewModel, onNavigateToSimulator: () -> Unit) 
             }
         }
 
-        // Notification Access Button
         Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text("Notification Access Required", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSecondaryContainer)
-                Text("You must grant Notification Access so the app can read WhatsApp messages.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSecondaryContainer)
+                Text("Grant Notification Access so the app can read WhatsApp messages.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSecondaryContainer)
                 Spacer(modifier = Modifier.height(8.dp))
                 Button(
                     onClick = {
