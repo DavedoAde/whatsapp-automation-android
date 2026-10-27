@@ -76,17 +76,22 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
     // --- BATTERY REMINDER DIALOG STATE ---
     val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
     var showBatteryDialog by remember { mutableStateOf(false) }
+    
+    // We use a flag to ensure it only checks when the app actually opens/resumes
+    var isFirstResume by remember { mutableStateOf(true) }
 
-    // Check battery status on launch/resume
+    // Check battery status when app opens/resumes
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                val isOptimized = !powerManager.isIgnoringBatteryOptimizations(context.packageName)
-                val isIgnored = PreferenceManager.isBatteryIgnored(context)
-                
-                // Show dialog if optimized AND user hasn't clicked "Ignore"
-                if (isOptimized && !isIgnored && !PreferenceManager.isFirstLaunch(context)) {
-                    showBatteryDialog = true
+                // Don't show the popup while on the welcome screen
+                if (currentRoute != "welcome") {
+                    val isOptimized = !powerManager.isIgnoringBatteryOptimizations(context.packageName)
+                    val isIgnored = PreferenceManager.isBatteryIgnored(context)
+                    
+                    if (isOptimized && !isIgnored) {
+                        showBatteryDialog = true
+                    }
                 }
             }
         }
@@ -102,28 +107,12 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
                 TopAppBar(
                     title = { Text("WhatsApp Automation", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleLarge) },
                     actions = {
+                        // Master ON/OFF Switch
                         Switch(
                             checked = isAutomationActive,
                             onCheckedChange = { isChecked ->
-                                if (isChecked) {
-                                    val hasNotif = NotificationManagerCompat.getEnabledListenerPackages(context).contains(context.packageName)
-                                    val hasContact = ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_CONTACTS) == PackageManager.PERMISSION_GRANTED
-                                    val isOptimized = !powerManager.isIgnoringBatteryOptimizations(context.packageName)
-                                    
-                                    // If they have permissions but battery is optimized, warn them via the dialog
-                                    if (hasNotif && hasContact) {
-                                        if (isOptimized && !PreferenceManager.isBatteryIgnored(context)) {
-                                            showBatteryDialog = true
-                                        } else {
-                                            viewModel.toggleAutomation(true)
-                                        }
-                                    } else {
-                                        // Missing permissions logic (simplified for this fix)
-                                        showBatteryDialog = true 
-                                    }
-                                } else {
-                                    viewModel.toggleAutomation(false)
-                                }
+                                // FIXED: We just turn it on/off. No battery popup here.
+                                viewModel.toggleAutomation(isChecked)
                             },
                             modifier = Modifier.padding(end = 16.dp),
                             colors = SwitchDefaults.colors(
@@ -230,7 +219,11 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
     // --- THE BATTERY REMINDER DIALOG ---
     if (showBatteryDialog) {
         AlertDialog(
-            onDismissRequest = { /* Force them to click a button */ },
+            onDismissRequest = { 
+                // If they tap outside the dialog, treat it as Ignore
+                PreferenceManager.setBatteryIgnored(context, true)
+                showBatteryDialog = false 
+            },
             title = { Text("Battery Optimization is ON") },
             text = { 
                 Text("Your phone is restricting background apps. To ensure auto-replies work reliably, please set battery usage to 'Unrestricted' in settings.") 
