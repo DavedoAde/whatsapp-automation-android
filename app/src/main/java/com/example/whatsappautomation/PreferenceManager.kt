@@ -6,6 +6,7 @@ import android.content.SharedPreferences
 object PreferenceManager {
     private const val PREF_NAME = "whatsapp_automation_prefs"
     private const val KEY_FIRST_LAUNCH = "is_first_launch"
+    private const val KEY_AUTOMATION_ACTIVE = "is_automation_active"
     private const val KEY_WA_ORIGINAL = "wa_original_enabled"
     private const val KEY_WA_BUSINESS = "wa_business_enabled"
 
@@ -13,6 +14,7 @@ object PreferenceManager {
         return context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
     }
 
+    // --- ONBOARDING ---
     fun isFirstLaunch(context: Context): Boolean {
         return getPrefs(context).getBoolean(KEY_FIRST_LAUNCH, true)
     }
@@ -21,7 +23,16 @@ object PreferenceManager {
         getPrefs(context).edit().putBoolean(KEY_FIRST_LAUNCH, false).apply()
     }
 
-    // Defaults to true so the app works out of the box
+    // --- AUTOMATION STATE ---
+    fun isAutomationActive(context: Context): Boolean {
+        return getPrefs(context).getBoolean(KEY_AUTOMATION_ACTIVE, false)
+    }
+
+    fun setAutomationActive(context: Context, isActive: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_AUTOMATION_ACTIVE, isActive).apply()
+    }
+
+    // --- WA VERSION TOGGLES ---
     fun isWaOriginalEnabled(context: Context): Boolean {
         return getPrefs(context).getBoolean(KEY_WA_ORIGINAL, true)
     }
