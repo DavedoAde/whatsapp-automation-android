@@ -1,5 +1,10 @@
 package com.example.whatsappautomation
 
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.os.PowerManager
+import android.provider.Settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -14,7 +19,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -29,7 +34,6 @@ fun DashboardScreen(viewModel: AppViewModel, onNavigateToSimulator: () -> Unit) 
     
     Column(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         
-        // Stats Row
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             StatCard(title = "Active Rules", value = "$activeRulesCount", icon = Icons.Default.Rule, modifier = Modifier.weight(1f))
             StatCard(title = "Contacts", value = "$totalContactsCount", icon = Icons.Default.People, modifier = Modifier.weight(1f))
@@ -37,7 +41,6 @@ fun DashboardScreen(viewModel: AppViewModel, onNavigateToSimulator: () -> Unit) 
 
         Spacer(modifier = Modifier.weight(1f))
 
-        // Big Simulator Button
         Button(
             onClick = onNavigateToSimulator, 
             modifier = Modifier.fillMaxWidth().height(56.dp),
@@ -61,7 +64,7 @@ fun StatCard(title: String, value: String, icon: androidx.compose.ui.graphics.ve
     }
 }
 
-// --- CONTACTS (CRM) ---
+// --- CONTACTS ---
 @Composable
 fun ContactsScreen(viewModel: AppViewModel) {
     val contacts by viewModel.allContacts.collectAsState()
@@ -239,6 +242,7 @@ fun RuleCard(rule: AutomationRule, onToggleClick: () -> Unit, onEditClick: () ->
 // --- SETTINGS ---
 @Composable
 fun SettingsScreen() {
+    val context = LocalContext.current
     var enableOriginalWA by remember { mutableStateOf(true) }
     var enableWABusiness by remember { mutableStateOf(true) }
     var enableMultiUser by remember { mutableStateOf(false) }
@@ -246,6 +250,25 @@ fun SettingsScreen() {
     Column(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text("Settings", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
         
+        // Battery Optimization Card (CRITICAL FOR BACKGROUND SERVICE)
+        Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("Battery Optimization", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onErrorContainer)
+                Text("Android may kill the background listener to save battery. Disable optimization to keep the bot running 24/7.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onErrorContainer)
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(
+                    onClick = {
+                        val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+                        intent.data = Uri.parse("package:${context.packageName}")
+                        context.startActivity(intent)
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Disable Battery Optimization")
+                }
+            }
+        }
+
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text("Version of WA", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
