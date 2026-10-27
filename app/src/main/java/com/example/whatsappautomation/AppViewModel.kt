@@ -44,13 +44,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { ruleDao.deleteRuleById(rule.id) }
     }
 
-    // --- SIMULATOR LOGIC (Shares BotStateManager with real service) ---
     private var currentSenderId = "+1234567890" 
 
     fun simulateMessage(message: String): String {
         val allRulesList = allRules.value
         
-        // 1. Handle Lead Capture State Machine
         when (BotStateManager.currentLeadState) {
             LeadCaptureState.AWAITING_NAME -> {
                 BotStateManager.tempName = RuleEngine.extractName(message)
@@ -78,7 +76,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     
                     val successMsg = BotStateManager.activeRule?.successMessage?.replace("{name}", BotStateManager.tempName) ?: "Saved!"
                     
-                    // Check for submenu
                     val hasSubMenu = allRulesList.any { it.parentRuleId == BotStateManager.activeRule?.id }
                     if (hasSubMenu) {
                         BotStateManager.currentMenuId = BotStateManager.activeRule?.id
@@ -101,7 +98,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             LeadCaptureState.IDLE -> { /* Continue */ }
         }
 
-        // 2. Submenu Routing
         if (BotStateManager.currentMenuId != null) {
             val childRules = allRulesList.filter { it.parentRuleId == BotStateManager.currentMenuId && it.isActive }
             val matchedChild = RuleEngine.findMatchingRule(message, childRules)
@@ -117,11 +113,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 return RuleEngine.getReplyText(matchedChild, number = currentSenderId)
             } else {
-                return "" // Silent if invalid
+                return ""
             }
         }
 
-        // 3. Top Level Rules
         val topLevelRules = allRulesList.filter { it.parentRuleId == null }
         val matchedRule = RuleEngine.findMatchingRule(message, topLevelRules)
         
