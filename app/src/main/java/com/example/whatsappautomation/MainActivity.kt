@@ -81,7 +81,6 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
     var hasNotifAccess by remember { mutableStateOf(checkNotificationAccess(context)) }
     var hasContactAccess by remember { mutableStateOf(checkContactAccess(context)) }
     
-    // Dialog State
     var showPermissionDialog by remember { mutableStateOf(false) }
     var isTurningOnAutomation by remember { mutableStateOf(false) }
 
@@ -89,7 +88,6 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         hasContactAccess = isGranted
-        // If they just granted it and the dialog is open, check if we are done
         if (isTurningOnAutomation && hasNotifAccess && hasContactAccess) {
             viewModel.toggleAutomation(true)
             showPermissionDialog = false
@@ -104,21 +102,26 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                // 1. Re-check permissions when coming back from settings
+                // 1. Re-check permissions
                 hasNotifAccess = checkNotificationAccess(context)
                 hasContactAccess = checkContactAccess(context)
 
-                // 2. If the user was trying to turn on the switch, and now has all permissions, turn it on!
+                // 2. Finish turning on automation if permissions are now granted
                 if (isTurningOnAutomation && hasNotifAccess && hasContactAccess) {
                     viewModel.toggleAutomation(true)
                     showPermissionDialog = false
                     isTurningOnAutomation = false
-                }
-
-                // 3. Check Battery
-                if (currentRoute != "welcome") {
+                    
+                    // NOW check if we should show the battery dialog immediately after
                     val isOptimized = !powerManager.isIgnoringBatteryOptimizations(context.packageName)
-                    if (isOptimized && !PreferenceManager.isFirstLaunch(context)) {
+                    if (isOptimized && !PreferenceManager.isBatteryIgnored(context)) {
+                        showBatteryDialog = true
+                    }
+                } 
+                // 3. If NOT currently in the permission flow, check battery status normally
+                else if (!showPermissionDialog && currentRoute != "welcome") {
+                    val isOptimized = !powerManager.isIgnoringBatteryOptimizations(context.packageName)
+                    if (isOptimized && !PreferenceManager.isBatteryIgnored(context) && !PreferenceManager.isFirstLaunch(context)) {
                         showBatteryDialog = true
                     } else {
                         showBatteryDialog = false
@@ -144,6 +147,11 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
                                 if (isChecked) {
                                     if (hasNotifAccess && hasContactAccess) {
                                         viewModel.toggleAutomation(true)
+                                        // Check battery right away
+                                        val isOptimized = !powerManager.isIgnoringBatteryOptimizations(context.packageName)
+                                        if (isOptimized && !PreferenceManager.isBatteryIgnored(context)) {
+                                            showBatteryDialog = true
+                                        }
                                     } else {
                                         isTurningOnAutomation = true
                                         showPermissionDialog = true
@@ -267,7 +275,6 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text("To turn on the AutoResponder, you must grant the following permissions:")
                     
-                    // Notification Row
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                         Icon(
                             imageVector = if (hasNotifAccess) Icons.Default.CheckCircle else Icons.Default.Warning,
@@ -284,7 +291,6 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
                         }
                     }
 
-                    // Contact Row
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                         Icon(
                             imageVector = if (hasContactAccess) Icons.Default.CheckCircle else Icons.Default.Warning,
@@ -302,12 +308,17 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
                 }
             },
             confirmButton = {
-                // Only show "Done" if both are granted. Otherwise, "Close".
                 if (hasNotifAccess && hasContactAccess) {
                     Button(onClick = {
                         viewModel.toggleAutomation(true)
                         showPermissionDialog = false
                         isTurningOnAutomation = false
+                        
+                        // Check battery right after
+                        val isOptimized = !powerManager.isIgnoringBatteryOptimizations(context.packageName)
+                        if (isOptimized && !PreferenceManager.isBatteryIgnored(context)) {
+                            showBatteryDialog = true
+                        }
                     }) {
                         Text("Done")
                     }
@@ -323,12 +334,12 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
         )
     }
 
-    // --- BATTERY DIALOG ---
+    // --- BATTERY DIALOG (with Ignore) ---
     if (showBatteryDialog) {
         AlertDialog(
             onDismissRequest = { showBatteryDialog = false },
             title = { Text("Battery Optimization is ON") },
-            text = { Text("Your phone is restricting background apps. To ensure auto-replies work reliably, please set battery usage to 'Unrestricted' in settings.") },
+            text = { Text("Your phone is restricting background apps. To ensure auto-replies work reliably, please set battery usage to 'Unrestricted' in settings. This is optional, but highly recommended.") },
             confirmButton = {
                 Button(
                     onClick = {
@@ -346,12 +357,21 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
                 ) {
                     Text("Go to Settings")
                 }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        PreferenceManager.setBatteryIgnored(context, true)
+                        showBatteryDialog = false
+                    }
+                ) {
+                    Text("Ignore", color = Color.Gray)
+                }
             }
         )
     }
 }
 
-// Helper functions for permission checks
 fun checkNotificationAccess(context: Context): Boolean {
     val enabledListeners = NotificationManagerCompat.getEnabledListenerPackages(context)
     return enabledListeners.contains(context.packageName)
