@@ -5,6 +5,10 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -21,7 +25,6 @@ import androidx.navigation.navArgument
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // This is the magic command for modern Android UI
         enableEdgeToEdge() 
         setContent {
             WhatsAppAutomationTheme {
@@ -35,12 +38,22 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
     val navController = rememberNavController()
-    val screens = listOf(Screen.Dashboard, Screen.Contacts, Screen.Rules)
+    val screens = listOf(
+        Screen.Dashboard, 
+        Screen.Contacts, 
+        Screen.Rules,
+        Screen.Settings
+    )
     
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
     
-    val isMainScreen = currentRoute in listOf(Screen.Dashboard.route, Screen.Contacts.route, Screen.Rules.route)
+    val isMainScreen = currentRoute in listOf(
+        Screen.Dashboard.route, 
+        Screen.Contacts.route, 
+        Screen.Rules.route,
+        Screen.Settings.route
+    )
 
     Scaffold(
         topBar = {
@@ -81,14 +94,15 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
                 DashboardScreen(viewModel, onNavigateToSimulator = { navController.navigate("simulator") }) 
             }
             composable(Screen.Contacts.route) { ContactsScreen(viewModel) }
-            
             composable(Screen.Rules.route) { 
                 RulesScreen(
                     viewModel = viewModel,
                     onEditRule = { ruleId -> navController.navigate("rule_editor/$ruleId/0") }
                 ) 
             }
-            
+            composable(Screen.Settings.route) {
+                SettingsScreen()
+            }
             composable("simulator") { 
                 SimulatorScreen(viewModel, onBack = { navController.popBackStack() }) 
             }
@@ -116,7 +130,6 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
                         navController.popBackStack()
                     },
                     onAddChildRule = { parentRuleId ->
-                        // This opens the exact same Rule Editor screen, but linked to the parent!
                         navController.navigate("rule_editor/0/$parentRuleId")
                     },
                     onEditChildRule = { childId ->
