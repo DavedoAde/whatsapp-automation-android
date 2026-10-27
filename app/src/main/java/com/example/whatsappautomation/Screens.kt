@@ -1,11 +1,5 @@
 package com.example.whatsappautomation
 
-import android.Manifest
-import android.content.Intent
-import android.content.pm.PackageManager
-import android.provider.Settings
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -21,11 +15,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat
 import com.example.whatsappautomation.data.AutomationRule
 import com.example.whatsappautomation.data.Contact
 
@@ -35,15 +27,6 @@ fun DashboardScreen(viewModel: AppViewModel, onNavigateToSimulator: () -> Unit) 
     val activeRulesCount by viewModel.activeRulesCount.collectAsState()
     val totalContactsCount by viewModel.totalContactsCount.collectAsState()
     
-    val context = LocalContext.current
-    var hasContactPermission by remember {
-        mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_CONTACTS) == PackageManager.PERMISSION_GRANTED)
-    }
-
-    val permissionLauncher = rememberLauncherForActivityResult(contract = ActivityResultContracts.RequestPermission()) { isGranted ->
-        hasContactPermission = isGranted
-    }
-
     Column(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         
         // Stats Row
@@ -51,28 +34,6 @@ fun DashboardScreen(viewModel: AppViewModel, onNavigateToSimulator: () -> Unit) 
             StatCard(title = "Active Rules", value = "$activeRulesCount", icon = Icons.Default.Rule, modifier = Modifier.weight(1f))
             StatCard(title = "Contacts", value = "$totalContactsCount", icon = Icons.Default.People, modifier = Modifier.weight(1f))
         }
-
-        // Permission Checklist
-        Text("System Status", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 8.dp))
-        
-        PermissionCard(
-            title = "Notification Access",
-            desc = "Required to read WhatsApp messages.",
-            isGranted = true, // Assuming granted if app is working, but you can add a real check here
-            onGrantClick = {
-                val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
-                context.startActivity(intent)
-            }
-        )
-
-        PermissionCard(
-            title = "Contact Access",
-            desc = "Required to automatically save leads.",
-            isGranted = hasContactPermission,
-            onGrantClick = {
-                permissionLauncher.launch(Manifest.permission.WRITE_CONTACTS)
-            }
-        )
 
         Spacer(modifier = Modifier.weight(1f))
 
@@ -96,30 +57,6 @@ fun StatCard(title: String, value: String, icon: androidx.compose.ui.graphics.ve
             Spacer(modifier = Modifier.height(8.dp))
             Text(value, fontSize = 28.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
             Text(title, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
-        }
-    }
-}
-
-@Composable
-fun PermissionCard(title: String, desc: String, isGranted: Boolean, onGrantClick: () -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth().clickable { if (!isGranted) onGrantClick() },
-        colors = CardDefaults.cardColors(containerColor = if (isGranted) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.errorContainer)
-    ) {
-        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                imageVector = if (isGranted) Icons.Default.CheckCircle else Icons.Default.Warning,
-                contentDescription = null,
-                tint = if (isGranted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
-            )
-            Spacer(modifier = Modifier.width(16.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(title, fontWeight = FontWeight.Bold, color = if (isGranted) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onErrorContainer)
-                Text(desc, fontSize = 12.sp, color = if (isGranted) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f))
-            }
-            if (!isGranted) {
-                Text("Grant", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
-            }
         }
     }
 }
@@ -163,7 +100,6 @@ fun ContactsScreen(viewModel: AppViewModel) {
 fun ContactCard(contact: Contact) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            // Letter Avatar
             Box(
                 modifier = Modifier.size(48.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
                 contentAlignment = Alignment.Center
