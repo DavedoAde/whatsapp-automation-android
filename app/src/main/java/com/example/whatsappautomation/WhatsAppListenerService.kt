@@ -9,8 +9,10 @@ import android.service.notification.StatusBarNotification
 import com.example.whatsappautomation.data.AppDatabase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.random.Random
 
 class WhatsAppListenerService : NotificationListenerService() {
 
@@ -24,18 +26,13 @@ class WhatsAppListenerService : NotificationListenerService() {
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         val packageName = sbn.packageName
-        
-        // 1. Check for WhatsApp packages
         if (packageName != "com.whatsapp" && packageName != "com.whatsapp.w4b") return
-        
-        // 2. Ignore group summaries and ongoing events
         if ((sbn.notification.flags and Notification.FLAG_GROUP_SUMMARY) != 0) return
         if ((sbn.notification.flags and Notification.FLAG_ONGOING_EVENT) != 0) return
 
         val extras = sbn.notification.extras
         val senderName = extras.getString(Notification.EXTRA_TITLE) ?: "Unknown"
         
-        // 3. Ignore notifications if the sender is yourself ("Me", "You")
         if (senderName.equals("Me", ignoreCase = true) || senderName.equals("You", ignoreCase = true)) return
 
         var messageText = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: ""
@@ -48,42 +45,45 @@ class WhatsAppListenerService : NotificationListenerService() {
 
         if (messageText.isBlank()) return
         
-        // 4. Timestamp guard to prevent reading duplicate notifications
         val notificationTime = sbn.postTime
         if (notificationTime <= BotStateManager.lastNotificationTime) return
         BotStateManager.lastNotificationTime = notificationTime
 
-        // 5. DEDUPLICATION: Ignore if we just sent this exact message to this sender
         val messageKey = "$senderName:$messageText"
-        if (BotStateManager.recentlySentMessages.contains(messageKey)) {
-            return 
-        }
+        if (BotStateManager.recentlySentMessages.contains(messageKey)) return 
 
-        // 6. COOLDOWN: Ignore if we replied to this sender in the last 3 seconds
         val lastReply = BotStateManager.lastReplyTimeMap[senderName] ?: 0L
-        if (System.currentTimeMillis() - lastReply < 3000) {
-            return
-        }
+        if (System.currentTimeMillis() - lastReply < 3000) return
 
         scope.launch {
-            val replyText = processIncomingMessage(senderName, messageText)
+            val result = processIncomingMessage(senderName, messageText)
             
-            if (!replyText.isNullOrBlank()) {
+            if (result != null && !result.replyText.isNullOrBlank()) {
+                
+                // --- THE DELAY LOGIC ---
+                if (result.delayMax > 0) {
+                    val min = result.delayMin
+                    val max = result.delayMax
+                    val randomDelaySeconds = if (max > min) Random.nextInt(min, max) else min
+                    
+                    // Convert to milliseconds and wait
+                    delay(randomDelaySeconds * 1000L) 
+                }
+
                 val remoteInputAction = sbn.notification.actions?.find { it.remoteInputs != null }
                 
                 if (remoteInputAction != null) {
                     val remoteInput = remoteInputAction.remoteInputs[0]
                     val intent = Intent()
                     val bundle = Bundle()
-                    bundle.putCharSequence(remoteInput.resultKey, replyText)
+                    bundle.putCharSequence(remoteInput.resultKey, result.replyText)
                     
                     RemoteInput.addResultsToIntent(remoteInputAction.remoteInputs, intent, bundle)
                     
                     withContext(Dispatchers.Main) {
                         try {
                             remoteInputAction.actionIntent.send(applicationContext, 0, intent)
-                            // Record the sent message to prevent the loop
-                            BotStateManager.recordSentMessage(senderName, replyText)
+                            BotStateManager.recordSentMessage(senderName, result.replyText)
                         } catch (e: Exception) {
                             e.printStackTrace()
                         }
@@ -93,7 +93,10 @@ class WhatsAppListenerService : NotificationListenerService() {
         }
     }
 
-    private suspend fun processIncomingMessage(sender: String, message: String): String? {
+    // We return a custom data class here to pass the reply text AND the delay rules
+    data class ReplyResult(val replyText: String?, val delayMin: Int = 0, val delayMax: Int = 0)
+
+    private suspend fun processIncomingMessage(sender: String, message: String): ReplyResult? {
         val ruleDao = database.ruleDao()
         val contactDao = database.contactDao()
         
@@ -102,7 +105,11 @@ class WhatsAppListenerService : NotificationListenerService() {
                 if (BotStateManager.awaitingNameSender == sender) {
                     BotStateManager.tempName = RuleEngine.extractName(message)
                     BotStateManager.currentLeadState = LeadCaptureState.AWAITING_CONFIRMATION
-                    return BotStateManager.activeRule?.confirmQuestion?.replace("{name}", BotStateManager.tempName)
+                    return ReplyResult(
+                        BotStateManager.activeRule?.confirmQuestion?.replace("{name}", BotStateManager.tempName),
+                        BotStateManager.activeRule?.delayMin ?: 0,
+                        BotStateManager.activeRule?.delayMax ?: 0
+                    )
                 }
             }
             LeadCaptureState.AWAITING_CONFIRMATION -> {
@@ -127,17 +134,21 @@ class WhatsAppListenerService : NotificationListenerService() {
                             BotStateManager.currentMenuId = null
                         }
                         
+                        val delayMin = BotStateManager.activeRule?.delayMin ?: 0
+                        val delayMax = BotStateManager.activeRule?.delayMax ?: 0
+                        
                         BotStateManager.currentLeadState = LeadCaptureState.IDLE
                         BotStateManager.activeRule = null
                         BotStateManager.awaitingNameSender = null
                         
-                        return successMsg
+                        return ReplyResult(successMsg, delayMin, delayMax)
+                        
                     } else if (lowerMsg == "no" || lowerMsg == "n") {
                         BotStateManager.currentLeadState = LeadCaptureState.AWAITING_NAME
                         BotStateManager.tempName = ""
-                        return BotStateManager.activeRule?.retryQuestion ?: "What's your name again?"
+                        return ReplyResult(BotStateManager.activeRule?.retryQuestion ?: "What's your name again?")
                     } else {
-                        return "Please reply YES or NO."
+                        return ReplyResult("Please reply YES or NO.")
                     }
                 }
             }
@@ -154,11 +165,11 @@ class WhatsAppListenerService : NotificationListenerService() {
                 BotStateManager.currentLeadState = LeadCaptureState.AWAITING_NAME
                 BotStateManager.activeRule = matchedRule
                 BotStateManager.awaitingNameSender = sender
-                return matchedRule.promptQuestion
+                return ReplyResult(matchedRule.promptQuestion, matchedRule.delayMin, matchedRule.delayMax)
             }
-            RuleEngine.getReplyText(matchedRule, number = sender)
+            ReplyResult(RuleEngine.getReplyText(matchedRule, number = sender), matchedRule.delayMin, matchedRule.delayMax)
         } else {
-            null
+            null 
         }
     }
 }
