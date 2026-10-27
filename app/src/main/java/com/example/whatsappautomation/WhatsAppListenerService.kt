@@ -23,21 +23,15 @@ class WhatsAppListenerService : NotificationListenerService() {
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
-        // 1. Check if it's from WhatsApp or WhatsApp Business
         val packageName = sbn.packageName
         if (packageName != "com.whatsapp" && packageName != "com.whatsapp.w4b") return
-
-        // 2. Ignore group summaries or ongoing notifications
         if ((sbn.notification.flags and Notification.FLAG_GROUP_SUMMARY) != 0) return
         if ((sbn.notification.flags and Notification.FLAG_ONGOING_EVENT) != 0) return
 
         val extras = sbn.notification.extras
         val senderName = extras.getString(Notification.EXTRA_TITLE) ?: "Unknown"
         
-        // 3. Extract message text
         var messageText = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: ""
-        
-        // If it's a grouped message, EXTRA_TEXT might be null, try to get the last line
         if (messageText.isBlank()) {
             val textLines = extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)
             if (!textLines.isNullOrEmpty()) {
@@ -47,15 +41,10 @@ class WhatsAppListenerService : NotificationListenerService() {
 
         if (messageText.isBlank()) return
 
-        // 4. Check if the app is ON
-        // For simplicity, we'll assume it's ON, but in a real app, you'd check a SharedPreference
-
-        // 5. Process the message through our engine
         scope.launch {
             val replyText = processIncomingMessage(senderName, messageText)
             
             if (!replyText.isNullOrBlank()) {
-                // 6. Find the RemoteInput Action (The "Reply" button in the notification)
                 val remoteInputAction = sbn.notification.actions?.find { it.remoteInputs != null }
                 
                 if (remoteInputAction != null) {
@@ -85,7 +74,6 @@ class WhatsAppListenerService : NotificationListenerService() {
         // 1. Handle Lead Capture State Machine
         when (BotStateManager.currentLeadState) {
             LeadCaptureState.AWAITING_NAME -> {
-                // Ensure this message is from the same person we asked
                 if (BotStateManager.awaitingNameSender == sender) {
                     BotStateManager.tempName = RuleEngine.extractName(message)
                     BotStateManager.currentLeadState = LeadCaptureState.AWAITING_CONFIRMATION
@@ -96,7 +84,6 @@ class WhatsAppListenerService : NotificationListenerService() {
                 if (BotStateManager.awaitingNameSender == sender) {
                     val lowerMsg = message.trim().lowercase()
                     if (lowerMsg == "yes" || lowerMsg == "y") {
-                        // Save Contact
                         val newContact = com.example.whatsappautomation.data.Contact(
                             phoneNumber = sender, 
                             name = BotStateManager.tempName, 
@@ -105,14 +92,20 @@ class WhatsAppListenerService : NotificationListenerService() {
                         )
                         contactDao.insertContact(newContact)
                         
-                        // (Optional) Save to Phone Contacts here using PhoneContactManager
-                        
                         val successMsg = BotStateManager.activeRule?.successMessage?.replace("{name}", BotStateManager.tempName) ?: "Saved!"
                         
-                        // Activate Submenu if it exists
-                        val allRules = ruleDao.getAllRulesList() // Need a synchronous or list-based getter
-                        // For simplicity, we skip submenu routing here and just reset state
-                        BotStateManager.reset()
+                        val allRules = ruleDao.getAllRulesSync()
+                        val hasSubMenu = allRules.any { it.parentRuleId == BotStateManager.activeRule?.id }
+                        if (hasSubMenu) {
+                            BotStateManager.currentMenuId = BotStateManager.activeRule?.id
+                        } else {
+                            BotStateManager.currentMenuId = null
+                        }
+                        
+                        BotStateManager.currentLeadState = LeadCaptureState.IDLE
+                        BotStateManager.activeRule = null
+                        BotStateManager.awaitingNameSender = null
+                        
                         return successMsg
                     } else if (lowerMsg == "no" || lowerMsg == "n") {
                         BotStateManager.currentLeadState = LeadCaptureState.AWAITING_NAME
@@ -123,11 +116,11 @@ class WhatsAppListenerService : NotificationListenerService() {
                     }
                 }
             }
-            LeadCaptureState.IDLE -> { /* Proceed to normal rules */ }
+            LeadCaptureState.IDLE -> { /* Proceed */ }
         }
 
         // 2. Normal Rule Matching
-        val allRules = ruleDao.getAllRulesSync() // We need a synchronous getter for the service
+        val allRules = ruleDao.getAllRulesSync() // FIXED: Used getAllRulesSync()
         val topLevelRules = allRules.filter { it.parentRuleId == null && it.isActive }
         
         val matchedRule = RuleEngine.findMatchingRule(message, topLevelRules)
