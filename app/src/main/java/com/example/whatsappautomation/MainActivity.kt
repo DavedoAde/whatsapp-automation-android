@@ -21,6 +21,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
+import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -71,17 +73,28 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
 
     val isAutomationActive by viewModel.isAutomationActive.collectAsState()
     
-    // --- BATTERY REMINDER DIALOG STATE ---
+    // --- PERMISSIONS STATE ---
+    var showPermissionDialog by remember { mutableStateOf(false) }
+    val contactPermissionLauncher = rememberLauncherForActivityResult(contract = ActivityResultContracts.RequestPermission()) { }
+    
+    fun hasNotificationAccess(): Boolean {
+        val enabledListeners = NotificationManagerCompat.getEnabledListenerPackages(context)
+        return enabledListeners.contains(context.packageName)
+    }
+
+    fun hasContactAccess(): Boolean {
+        return ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_CONTACTS) == PackageManager.PERMISSION_GRANTED
+    }
+
+    // --- BATTERY DIALOG STATE ---
     val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
     var showBatteryDialog by remember { mutableStateOf(false) }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                // Only check if we are past the welcome screen and NOT on the very first launch session
                 if (currentRoute != "welcome") {
                     val isOptimized = !powerManager.isIgnoringBatteryOptimizations(context.packageName)
-                    // Ensure it only shows AFTER they have completed the initial setup once
                     val hasCompletedOnboarding = !PreferenceManager.isFirstLaunch(context)
                     
                     if (isOptimized && hasCompletedOnboarding) {
@@ -107,7 +120,16 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
                         Switch(
                             checked = isAutomationActive,
                             onCheckedChange = { isChecked ->
-                                viewModel.toggleAutomation(isChecked)
+                                if (isChecked) {
+                                    // FIXED: Check permissions before turning on
+                                    if (hasNotificationAccess() && hasContactAccess()) {
+                                        viewModel.toggleAutomation(true)
+                                    } else {
+                                        showPermissionDialog = true
+                                    }
+                                } else {
+                                    viewModel.toggleAutomation(false)
+                                }
                             },
                             modifier = Modifier.padding(end = 16.dp),
                             colors = SwitchDefaults.colors(
@@ -211,13 +233,36 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
         }
     }
 
+    // --- PERMISSION DIALOG ---
+    if (showPermissionDialog) {
+        AlertDialog(
+            onDismissRequest = { showPermissionDialog = false },
+            title = { Text("Permissions Required") },
+            text = { Text("To turn on the AutoResponder, you must grant Notification Access and Contact Access.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showPermissionDialog = false
+                        if (!hasNotificationAccess()) {
+                            val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
+                            context.startActivity(intent)
+                        } else if (!hasContactAccess()) {
+                            contactPermissionLauncher.launch(Manifest.permission.WRITE_CONTACTS)
+                        }
+                    }
+                ) {
+                    Text("Grant Permissions")
+                }
+            }
+        )
+    }
+
+    // --- BATTERY DIALOG ---
     if (showBatteryDialog) {
         AlertDialog(
             onDismissRequest = { showBatteryDialog = false },
             title = { Text("Battery Optimization is ON") },
-            text = { 
-                Text("Your phone is restricting background apps. To ensure auto-replies work reliably, please set battery usage to 'Unrestricted' in settings.") 
-            },
+            text = { Text("Your phone is restricting background apps. To ensure auto-replies work reliably, please set battery usage to 'Unrestricted' in settings.") },
             confirmButton = {
                 Button(
                     onClick = {
