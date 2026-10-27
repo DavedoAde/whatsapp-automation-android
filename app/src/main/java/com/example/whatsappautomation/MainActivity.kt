@@ -19,9 +19,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -46,6 +49,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val navController = rememberNavController()
     
     val startDestination = if (PreferenceManager.isFirstLaunch(context)) "welcome" else Screen.Dashboard.route
@@ -70,27 +74,46 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
     val isAutomationActive by viewModel.isAutomationActive.collectAsState()
     
     // --- BATTERY REMINDER STATE ---
-    // Check if battery optimization is ignored
     val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
-    val isBatteryOptimized = !powerManager.isIgnoringBatteryOptimizations(context.packageName)
     
-    // State to show the reminder screen. Defaults to true if optimized.
+    // We use a mutable state to hold the optimization status
+    var isBatteryOptimized by remember { 
+        mutableStateOf(!powerManager.isIgnoringBatteryOptimizations(context.packageName)) 
+    }
+    
     var showBatteryScreen by remember { mutableStateOf(isBatteryOptimized) }
 
-    // If the user granted optimization in settings and comes back, we hide the screen
-    LaunchedEffect(Unit) {
-        if (!isBatteryOptimized) {
-            showBatteryScreen = false
+    // LIFECYCLE FIX: Check the battery status every time the app resumes
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                isBatteryOptimized = !powerManager.isIgnoringBatteryOptimizations(context.packageName)
+                if (!isBatteryOptimized) {
+                    showBatteryScreen = false // Hide the screen if the user disabled it in settings
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
 
-    // If battery is still optimized, show the full screen reminder
     if (showBatteryScreen) {
         BatteryOptimizationScreen(
-            onBack = { showBatteryScreen = false } // Back arrow lets them temporarily bypass
+            onBack = { showBatteryScreen = false },
+            onRetry = { 
+                // Manually re-check the status when the user taps "Retry"
+                isBatteryOptimized = !powerManager.isIgnoringBatteryOptimizations(context.packageName)
+                if (!isBatteryOptimized) {
+                    showBatteryScreen = false
+                }
+            }
         )
     } else {
-        // Otherwise, show the main app interface
+        // ... (The rest of the Scaffold and NavHost code remains exactly the same) ...
+        // Please copy the Scaffold, TopAppBar, NavigationBar, and NavHost from the previous MainActivity code here.
+        // I have included it below for completeness.
         Scaffold(
             topBar = {
                 if (isMainScreen) {
@@ -101,14 +124,12 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
                                 checked = isAutomationActive,
                                 onCheckedChange = { isChecked ->
                                     if (isChecked) {
-                                        // Permission Gate Check
                                         val hasNotif = NotificationManagerCompat.getEnabledListenerPackages(context).contains(context.packageName)
                                         val hasContact = ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_CONTACTS) == PackageManager.PERMISSION_GRANTED
                                         
                                         if (hasNotif && hasContact && !isBatteryOptimized) {
                                             viewModel.toggleAutomation(true)
                                         } else {
-                                            // If they try to turn it on without permissions, show the warning again
                                             showBatteryScreen = true
                                         }
                                     } else {
