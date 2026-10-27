@@ -11,7 +11,8 @@ data class Contact(
     val sourceApp: String = "WhatsApp",
     val captureDate: Long = System.currentTimeMillis(),
     val isConfirmed: Boolean = true,
-    val leadStatus: String = "New"
+    val leadStatus: String = "New",
+    val tags: String = "" // e.g., "TikTok, Facebook"
 )
 
 @Entity(tableName = "rules")
@@ -19,21 +20,24 @@ data class AutomationRule(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val name: String,
     val triggerKeyword: String,
-    val replyMessage: String, 
+    val replyMessage: String, // Pipe-separated string for multiple replies
     val isActive: Boolean = true,
     val priority: Int = 1,
     
     // Card 1: Received Message
     val matchType: String = "SIMILARITY", // EXACT, SIMILARITY, PATTERN, REGEX, WELCOME
-    val targetChat: String = "ALL", // ALL, INDIVIDUALS, GROUPS, SPECIFIC
+    val targetChat: String = "ALL", // ALL, INDIVIDUALS, GROUPS
     
-    // Card 3: Multiple replies
-    val replyMode: String = "SINGLE", // SINGLE (1), ALL, RANDOM
+    // Card 2 & 3: Replies
+    val replyMode: String = "SINGLE", // SINGLE, ALL, RANDOM
     
-    // Card 4: Save Lead
+    // Card 4: Save Lead Machine
     val askForName: Boolean = false,
     val promptQuestion: String = "What's your name?",
-    val thankYouReply: String = "Nice to meet you, {name}!",
+    val confirmQuestion: String = "Is your name {name}? Reply YES or NO.",
+    val retryQuestion: String = "No problem. What's your name again?",
+    val successMessage: String = "Thank you {name}! Your details have been saved.",
+    val assignTag: String = "", 
     
     // Card 5: Conditions
     val requireScreenOff: Boolean = false,
