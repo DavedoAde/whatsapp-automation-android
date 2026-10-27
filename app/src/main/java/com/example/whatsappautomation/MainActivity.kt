@@ -13,9 +13,13 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -73,31 +77,48 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
 
     val isAutomationActive by viewModel.isAutomationActive.collectAsState()
     
-    // --- PERMISSIONS STATE ---
-    var showPermissionDialog by remember { mutableStateOf(false) }
-    val contactPermissionLauncher = rememberLauncherForActivityResult(contract = ActivityResultContracts.RequestPermission()) { }
+    // --- PERMISSION STATE ---
+    var hasNotifAccess by remember { mutableStateOf(checkNotificationAccess(context)) }
+    var hasContactAccess by remember { mutableStateOf(checkContactAccess(context)) }
     
-    fun hasNotificationAccess(): Boolean {
-        val enabledListeners = NotificationManagerCompat.getEnabledListenerPackages(context)
-        return enabledListeners.contains(context.packageName)
+    // Dialog State
+    var showPermissionDialog by remember { mutableStateOf(false) }
+    var isTurningOnAutomation by remember { mutableStateOf(false) }
+
+    val contactPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        hasContactAccess = isGranted
+        // If they just granted it and the dialog is open, check if we are done
+        if (isTurningOnAutomation && hasNotifAccess && hasContactAccess) {
+            viewModel.toggleAutomation(true)
+            showPermissionDialog = false
+            isTurningOnAutomation = false
+        }
     }
 
-    fun hasContactAccess(): Boolean {
-        return ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_CONTACTS) == PackageManager.PERMISSION_GRANTED
-    }
-
-    // --- BATTERY DIALOG STATE ---
+    // --- BATTERY STATE ---
     val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
     var showBatteryDialog by remember { mutableStateOf(false) }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
+                // 1. Re-check permissions when coming back from settings
+                hasNotifAccess = checkNotificationAccess(context)
+                hasContactAccess = checkContactAccess(context)
+
+                // 2. If the user was trying to turn on the switch, and now has all permissions, turn it on!
+                if (isTurningOnAutomation && hasNotifAccess && hasContactAccess) {
+                    viewModel.toggleAutomation(true)
+                    showPermissionDialog = false
+                    isTurningOnAutomation = false
+                }
+
+                // 3. Check Battery
                 if (currentRoute != "welcome") {
                     val isOptimized = !powerManager.isIgnoringBatteryOptimizations(context.packageName)
-                    val hasCompletedOnboarding = !PreferenceManager.isFirstLaunch(context)
-                    
-                    if (isOptimized && hasCompletedOnboarding) {
+                    if (isOptimized && !PreferenceManager.isFirstLaunch(context)) {
                         showBatteryDialog = true
                     } else {
                         showBatteryDialog = false
@@ -121,14 +142,15 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
                             checked = isAutomationActive,
                             onCheckedChange = { isChecked ->
                                 if (isChecked) {
-                                    // FIXED: Check permissions before turning on
-                                    if (hasNotificationAccess() && hasContactAccess()) {
+                                    if (hasNotifAccess && hasContactAccess) {
                                         viewModel.toggleAutomation(true)
                                     } else {
+                                        isTurningOnAutomation = true
                                         showPermissionDialog = true
                                     }
                                 } else {
                                     viewModel.toggleAutomation(false)
+                                    isTurningOnAutomation = false
                                 }
                             },
                             modifier = Modifier.padding(end = 16.dp),
@@ -233,25 +255,69 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
         }
     }
 
-    // --- PERMISSION DIALOG ---
+    // --- SMART PERMISSION DIALOG ---
     if (showPermissionDialog) {
         AlertDialog(
-            onDismissRequest = { showPermissionDialog = false },
+            onDismissRequest = { 
+                showPermissionDialog = false 
+                isTurningOnAutomation = false
+            },
             title = { Text("Permissions Required") },
-            text = { Text("To turn on the AutoResponder, you must grant Notification Access and Contact Access.") },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        showPermissionDialog = false
-                        if (!hasNotificationAccess()) {
-                            val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
-                            context.startActivity(intent)
-                        } else if (!hasContactAccess()) {
-                            contactPermissionLauncher.launch(Manifest.permission.WRITE_CONTACTS)
+            text = { 
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("To turn on the AutoResponder, you must grant the following permissions:")
+                    
+                    // Notification Row
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                        Icon(
+                            imageVector = if (hasNotifAccess) Icons.Default.CheckCircle else Icons.Default.Warning,
+                            contentDescription = null,
+                            tint = if (hasNotifAccess) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Notification Access", modifier = Modifier.weight(1f))
+                        if (!hasNotifAccess) {
+                            TextButton(onClick = {
+                                val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
+                                context.startActivity(intent)
+                            }) { Text("Grant") }
                         }
                     }
-                ) {
-                    Text("Grant Permissions")
+
+                    // Contact Row
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                        Icon(
+                            imageVector = if (hasContactAccess) Icons.Default.CheckCircle else Icons.Default.Warning,
+                            contentDescription = null,
+                            tint = if (hasContactAccess) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Contact Access", modifier = Modifier.weight(1f))
+                        if (!hasContactAccess) {
+                            TextButton(onClick = {
+                                contactPermissionLauncher.launch(Manifest.permission.WRITE_CONTACTS)
+                            }) { Text("Grant") }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                // Only show "Done" if both are granted. Otherwise, "Close".
+                if (hasNotifAccess && hasContactAccess) {
+                    Button(onClick = {
+                        viewModel.toggleAutomation(true)
+                        showPermissionDialog = false
+                        isTurningOnAutomation = false
+                    }) {
+                        Text("Done")
+                    }
+                } else {
+                    TextButton(onClick = { 
+                        showPermissionDialog = false 
+                        isTurningOnAutomation = false
+                    }) {
+                        Text("Close")
+                    }
                 }
             }
         )
@@ -283,6 +349,16 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
             }
         )
     }
+}
+
+// Helper functions for permission checks
+fun checkNotificationAccess(context: Context): Boolean {
+    val enabledListeners = NotificationManagerCompat.getEnabledListenerPackages(context)
+    return enabledListeners.contains(context.packageName)
+}
+
+fun checkContactAccess(context: Context): Boolean {
+    return ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_CONTACTS) == PackageManager.PERMISSION_GRANTED
 }
 
 @Composable
