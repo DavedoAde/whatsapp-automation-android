@@ -15,6 +15,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
+enum class LeadCaptureState {
+    IDLE,
+    AWAITING_NAME,
+    AWAITING_CONFIRMATION
+}
+
 class AppViewModel(application: Application) : AndroidViewModel(application) {
     
     private val database = AppDatabase.getDatabase(application)
@@ -30,60 +36,82 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     val activeRulesCount = ruleDao.getActiveRuleCount()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
-
     val allContacts = contactDao.getAllContacts()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
     val totalContactsCount = contactDao.getContactCount()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
-
     val allRules = ruleDao.getAllRules()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun saveRule(rule: AutomationRule) {
-        viewModelScope.launch {
-            ruleDao.insertRule(rule)
-        }
+        viewModelScope.launch { ruleDao.insertRule(rule) }
     }
-
     fun deleteRule(rule: AutomationRule) {
-        viewModelScope.launch {
-            ruleDao.deleteRuleById(rule.id)
-        }
+        viewModelScope.launch { ruleDao.deleteRuleById(rule.id) }
     }
 
-    // --- SIMULATION STATE ---
+    // --- LEAD CAPTURE STATE MACHINE ---
+    private var currentLeadState = LeadCaptureState.IDLE
     private var currentSimulatedMenuId: Long? = null
+    private var tempName: String = ""
+    private var activeRule: AutomationRule? = null
     private var currentSenderId = "+1234567890" 
-    
-    private var isAwaitingContactName = false 
-    private var awaitingRule: AutomationRule? = null // Store the rule so we can use its thank you message
 
     fun simulateMessage(message: String): String {
-        
-        // 1. If we are waiting for a name
-        if (isAwaitingContactName) {
-            val extractedName = RuleEngine.extractName(message)
-            
-            viewModelScope.launch {
-                val newContact = Contact(phoneNumber = currentSenderId, name = extractedName, sourceApp = "WhatsApp")
-                contactDao.insertContact(newContact)
-                
-                val context = getApplication<Application>()
-                if (ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_CONTACTS) == PackageManager.PERMISSION_GRANTED) {
-                    PhoneContactManager.saveContactToPhone(context, extractedName, currentSenderId)
-                }
+        // 1. Handle the Lead Capture State Machine
+        when (currentLeadState) {
+            LeadCaptureState.AWAITING_NAME -> {
+                tempName = RuleEngine.extractName(message)
+                currentLeadState = LeadCaptureState.AWAITING_CONFIRMATION
+                return activeRule?.confirmQuestion?.replace("{name}", tempName) ?: "Is your name $tempName? Reply YES or NO."
             }
             
-            isAwaitingContactName = false 
-            val thankYou = awaitingRule?.thankYouReply ?: "Thank you, {name}!"
-            awaitingRule = null
-            return thankYou.replace("{name}", extractedName)
+            LeadCaptureState.AWAITING_CONFIRMATION -> {
+                val lowerMsg = message.trim().lowercase()
+                if (lowerMsg == "yes" || lowerMsg == "y") {
+                    // Save the contact!
+                    viewModelScope.launch {
+                        val newContact = Contact(
+                            phoneNumber = currentSenderId, 
+                            name = tempName, 
+                            sourceApp = "WhatsApp",
+                            tags = activeRule?.assignTag ?: ""
+                        )
+                        contactDao.insertContact(newContact)
+                        
+                        val context = getApplication<Application>()
+                        if (ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_CONTACTS) == PackageManager.PERMISSION_GRANTED) {
+                            PhoneContactManager.saveContactToPhone(context, tempName, currentSenderId)
+                        }
+                    }
+                    
+                    currentLeadState = LeadCaptureState.IDLE
+                    val successMsg = activeRule?.successMessage?.replace("{name}", tempName) ?: "Thank you $tempName!"
+                    
+                    // If the rule has a submenu, move into it so the next message triggers the link
+                    val allRulesList = allRules.value
+                    val hasSubMenu = allRulesList.any { it.parentRuleId == activeRule?.id }
+                    if (hasSubMenu) {
+                        currentSimulatedMenuId = activeRule?.id
+                    } else {
+                        currentSimulatedMenuId = null
+                    }
+                    activeRule = null
+                    return successMsg
+                    
+                } else if (lowerMsg == "no" || lowerMsg == "n") {
+                    currentLeadState = LeadCaptureState.AWAITING_NAME
+                    tempName = ""
+                    return activeRule?.retryQuestion ?: "No problem. What's your name again?"
+                } else {
+                    return "Please reply YES or NO. Is your name $tempName?"
+                }
+            }
+            LeadCaptureState.IDLE -> { /* Continue to normal rule matching */ }
         }
 
+        // 2. If we are currently inside a submenu
         val allRulesList = allRules.value
-
-        // 2. Submenu Routing
         if (currentSimulatedMenuId != null) {
             val childRules = allRulesList.filter { it.parentRuleId == currentSimulatedMenuId && it.isActive }
             val matchedChild = RuleEngine.findMatchingRule(message, childRules)
@@ -93,18 +121,17 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 currentSimulatedMenuId = if (hasSubMenu) matchedChild.id else null
                 
                 if (matchedChild.askForName) {
-                    isAwaitingContactName = true
-                    awaitingRule = matchedChild
+                    currentLeadState = LeadCaptureState.AWAITING_NAME
+                    activeRule = matchedChild
+                    return matchedChild.promptQuestion
                 }
                 return RuleEngine.getReplyText(matchedChild, number = currentSenderId)
             } else {
-                val parentMenu = allRulesList.find { it.id == currentSimulatedMenuId }
-                val parentText = if (parentMenu != null) RuleEngine.getReplyText(parentMenu, number = currentSenderId) else ""
-                return "Invalid option. Please choose from the menu:\n\n$parentText"
+                return "" // Stay silent if invalid option in submenu
             }
         }
 
-        // 3. Standard Top-Level
+        // 3. Standard Top-Level Rules
         val topLevelRules = allRulesList.filter { it.parentRuleId == null }
         val matchedRule = RuleEngine.findMatchingRule(message, topLevelRules)
         
@@ -113,13 +140,17 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             currentSimulatedMenuId = if (hasSubMenu) matchedRule.id else null
 
             if (matchedRule.askForName) {
-                isAwaitingContactName = true
-                awaitingRule = matchedRule
-                return matchedRule.promptQuestion // Return the prompt immediately
+                currentLeadState = LeadCaptureState.AWAITING_NAME
+                activeRule = matchedRule
+                return matchedRule.promptQuestion
             }
-            RuleEngine.getReplyText(matchedRule, number = currentSenderId)
+            RuleRuleEngineReply(matchedRule)
         } else {
-            "No rule matched. (No reply sent)"
+            "" // Stay completely silent
         }
+    }
+
+    private fun RuleRuleEngineReply(rule: AutomationRule): String {
+         return RuleEngine.getReplyText(rule, number = currentSenderId)
     }
 }
