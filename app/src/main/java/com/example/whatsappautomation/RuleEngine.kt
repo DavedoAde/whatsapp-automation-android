@@ -10,6 +10,11 @@ object RuleEngine {
         val activeRules = rules.filter { it.isActive }.sortedBy { it.priority }
 
         for (rule in activeRules) {
+            // The Catch-All Logic (*)
+            if (rule.triggerKeyword.trim() == "*") {
+                return rule
+            }
+
             val isMatch = when (rule.matchType) {
                 "EXACT" -> normalizeText(message) == normalizeText(rule.triggerKeyword)
                 "SIMILARITY" -> calculateSimilarity(message, rule.triggerKeyword) >= 0.75
@@ -31,16 +36,12 @@ object RuleEngine {
     }
 
     private fun normalizeText(text: String): String {
-        return text.lowercase()
-            .replace(Regex("[^a-z0-9\\s]"), "") 
-            .replace(Regex("\\s+"), " ") 
-            .trim()
+        return text.lowercase().replace(Regex("[^a-z0-9\\s]"), "").replace(Regex("\\s+"), " ").trim()
     }
 
     private fun calculateSimilarity(s1: String, s2: String): Double {
         val longer = if (s1.length > s2.length) s1 else s2
         val shorter = if (s1.length > s2.length) s2 else s1
-        
         if (longer.isEmpty()) return 1.0
         val distance = levenshteinDistance(longer.lowercase(), shorter.lowercase())
         return (longer.length - distance).toDouble() / longer.length.toDouble()
@@ -50,15 +51,12 @@ object RuleEngine {
         val lhsLength = lhs.length + 1
         val rhsLength = rhs.length + 1
         val cost = Array(lhsLength) { IntArray(rhsLength) }
-
         for (i in 0 until lhsLength) cost[i][0] = i
         for (j in 0 until rhsLength) cost[0][j] = j
-
         for (i in 1 until lhsLength) {
             for (j in 1 until rhsLength) {
                 cost[i][j] = minOf(
-                    cost[i - 1][j] + 1,
-                    cost[i][j - 1] + 1,
+                    cost[i - 1][j] + 1, cost[i][j - 1] + 1,
                     cost[i - 1][j - 1] + if (lhs[i - 1] == rhs[j - 1]) 0 else 1
                 )
             }
@@ -67,17 +65,12 @@ object RuleEngine {
     }
 
     private fun checkWildcardPattern(message: String, pattern: String): Boolean {
-        val regexPattern = pattern
-            .replace("//", "|")
-            .replace("*", ".*")
+        val regexPattern = pattern.replace("//", "|").replace("*", ".*")
         return try {
             Regex(regexPattern, RegexOption.IGNORE_CASE).containsMatchIn(message)
-        } catch (e: Exception) {
-            false
-        }
+        } catch (e: Exception) { false }
     }
 
-    // Updated to handle {name} and {number} replacements
     fun getReplyText(rule: AutomationRule, name: String = "", number: String = ""): String {
         val replies = rule.replyMessage.split("|").filter { it.isNotBlank() }
         if (replies.isEmpty()) return ""
@@ -97,7 +90,6 @@ object RuleEngine {
         val lower = input.trim().lowercase()
         val prefixes = listOf("my name is ", "i am ", "im ", "call me ", "it's ", "its ")
         var name = input.trim()
-        
         for (prefix in prefixes) {
             if (lower.startsWith(prefix)) {
                 name = name.substring(prefix.length).trim()
