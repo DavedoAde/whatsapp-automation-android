@@ -19,6 +19,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
 
 data class ChatMessage(val text: String, val isUser: Boolean)
 
@@ -28,6 +29,17 @@ fun SimulatorScreen(viewModel: AppViewModel, onBack: () -> Unit) {
     var inputMessage by remember { mutableStateOf("") }
     val messages = remember { mutableStateListOf<ChatMessage>() }
     val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+    
+    // Check Master Switch state
+    val isAutomationActive by viewModel.isAutomationActive.collectAsState()
+    var showOffDialog by remember { mutableStateOf(false) }
+
+    LaunchedEffect(isAutomationActive) {
+        if (!isAutomationActive) {
+            showOffDialog = true
+        }
+    }
 
     LaunchedEffect(Unit) {
         if (messages.isEmpty()) {
@@ -39,6 +51,26 @@ fun SimulatorScreen(viewModel: AppViewModel, onBack: () -> Unit) {
         if (messages.isNotEmpty()) {
             listState.animateScrollToItem(messages.size - 1)
         }
+    }
+
+    // Master Switch Dialog
+    if (showOffDialog) {
+        AlertDialog(
+            onDismissRequest = { 
+                showOffDialog = false 
+                onBack() // Kick them out of the simulator
+            },
+            title = { Text("Test your rules") },
+            text = { Text("AutoResponder is off. Please activate it using the switch at the top.") },
+            confirmButton = {
+                Button(onClick = { 
+                    showOffDialog = false 
+                    onBack() 
+                }) {
+                    Text("OK")
+                }
+            }
+        )
     }
 
     Scaffold(
@@ -86,20 +118,22 @@ fun SimulatorScreen(viewModel: AppViewModel, onBack: () -> Unit) {
                 Spacer(modifier = Modifier.width(8.dp))
                 FloatingActionButton(
                     onClick = {
-                        if (inputMessage.isNotBlank()) {
+                        if (inputMessage.isNotBlank() && isAutomationActive) {
                             val userText = inputMessage
                             messages.add(ChatMessage(userText, true))
                             inputMessage = ""
 
-                            val botReplyText = viewModel.simulateMessage(userText)
-                            
-                            // SILENT MODE: Only add a bubble if the bot actually replies
-                            if (botReplyText.isNotBlank()) {
-                                messages.add(ChatMessage(botReplyText, false))
+                            // Launch coroutine to handle the delay
+                            scope.launch {
+                                val botReplyText = viewModel.simulateMessage(userText)
+                                
+                                if (botReplyText.isNotBlank()) {
+                                    messages.add(ChatMessage(botReplyText, false))
+                                }
                             }
                         }
                     },
-                    containerColor = Color(0xFF00A884),
+                    containerColor = if (isAutomationActive) Color(0xFF00A884) else Color.Gray,
                     shape = CircleShape,
                     modifier = Modifier.size(48.dp)
                 ) {
