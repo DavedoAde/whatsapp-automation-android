@@ -73,23 +73,20 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
 
     val isAutomationActive by viewModel.isAutomationActive.collectAsState()
     
-    // --- BATTERY REMINDER STATE ---
+    // --- BATTERY REMINDER DIALOG STATE ---
     val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
-    
-    // We use a mutable state to hold the optimization status
-    var isBatteryOptimized by remember { 
-        mutableStateOf(!powerManager.isIgnoringBatteryOptimizations(context.packageName)) 
-    }
-    
-    var showBatteryScreen by remember { mutableStateOf(isBatteryOptimized) }
+    var showBatteryDialog by remember { mutableStateOf(false) }
 
-    // LIFECYCLE FIX: Check the battery status every time the app resumes
+    // Check battery status on launch/resume
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                isBatteryOptimized = !powerManager.isIgnoringBatteryOptimizations(context.packageName)
-                if (!isBatteryOptimized) {
-                    showBatteryScreen = false // Hide the screen if the user disabled it in settings
+                val isOptimized = !powerManager.isIgnoringBatteryOptimizations(context.packageName)
+                val isIgnored = PreferenceManager.isBatteryIgnored(context)
+                
+                // Show dialog if optimized AND user hasn't clicked "Ignore"
+                if (isOptimized && !isIgnored && !PreferenceManager.isFirstLaunch(context)) {
+                    showBatteryDialog = true
                 }
             }
         }
@@ -99,144 +96,175 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
         }
     }
 
-    if (showBatteryScreen) {
-        BatteryOptimizationScreen(
-            onBack = { showBatteryScreen = false },
-            onRetry = { 
-                // Manually re-check the status when the user taps "Retry"
-                isBatteryOptimized = !powerManager.isIgnoringBatteryOptimizations(context.packageName)
-                if (!isBatteryOptimized) {
-                    showBatteryScreen = false
-                }
-            }
-        )
-    } else {
-        // ... (The rest of the Scaffold and NavHost code remains exactly the same) ...
-        // Please copy the Scaffold, TopAppBar, NavigationBar, and NavHost from the previous MainActivity code here.
-        // I have included it below for completeness.
-        Scaffold(
-            topBar = {
-                if (isMainScreen) {
-                    TopAppBar(
-                        title = { Text("WhatsApp Automation", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleLarge) },
-                        actions = {
-                            Switch(
-                                checked = isAutomationActive,
-                                onCheckedChange = { isChecked ->
-                                    if (isChecked) {
-                                        val hasNotif = NotificationManagerCompat.getEnabledListenerPackages(context).contains(context.packageName)
-                                        val hasContact = ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_CONTACTS) == PackageManager.PERMISSION_GRANTED
-                                        
-                                        if (hasNotif && hasContact && !isBatteryOptimized) {
-                                            viewModel.toggleAutomation(true)
+    Scaffold(
+        topBar = {
+            if (isMainScreen) {
+                TopAppBar(
+                    title = { Text("WhatsApp Automation", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleLarge) },
+                    actions = {
+                        Switch(
+                            checked = isAutomationActive,
+                            onCheckedChange = { isChecked ->
+                                if (isChecked) {
+                                    val hasNotif = NotificationManagerCompat.getEnabledListenerPackages(context).contains(context.packageName)
+                                    val hasContact = ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_CONTACTS) == PackageManager.PERMISSION_GRANTED
+                                    val isOptimized = !powerManager.isIgnoringBatteryOptimizations(context.packageName)
+                                    
+                                    // If they have permissions but battery is optimized, warn them via the dialog
+                                    if (hasNotif && hasContact) {
+                                        if (isOptimized && !PreferenceManager.isBatteryIgnored(context)) {
+                                            showBatteryDialog = true
                                         } else {
-                                            showBatteryScreen = true
+                                            viewModel.toggleAutomation(true)
                                         }
                                     } else {
-                                        viewModel.toggleAutomation(false)
+                                        // Missing permissions logic (simplified for this fix)
+                                        showBatteryDialog = true 
                                     }
-                                },
-                                modifier = Modifier.padding(end = 16.dp),
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = MaterialTheme.colorScheme.primary,
-                                    checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
-                                )
-                            )
-                        },
-                        colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
-                    )
-                }
-            },
-            bottomBar = {
-                if (isMainScreen) {
-                    NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
-                        screens.forEach { screen ->
-                            NavigationBarItem(
-                                icon = { Icon(screen.icon, contentDescription = screen.title) },
-                                label = { Text(screen.title) },
-                                selected = currentRoute == screen.route,
-                                colors = NavigationBarItemDefaults.colors(
-                                    selectedIconColor = MaterialTheme.colorScheme.primary,
-                                    selectedTextColor = MaterialTheme.colorScheme.primary,
-                                    indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
-                                ),
-                                onClick = {
-                                    navController.navigate(screen.route) {
-                                        popUpTo(navController.graph.startDestinationId) { saveState = true }
-                                        launchSingleTop = true
-                                        restoreState = true
-                                    }
+                                } else {
+                                    viewModel.toggleAutomation(false)
                                 }
+                            },
+                            modifier = Modifier.padding(end = 16.dp),
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = MaterialTheme.colorScheme.primary,
+                                checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
                             )
-                        }
+                        )
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
+                )
+            }
+        },
+        bottomBar = {
+            if (isMainScreen) {
+                NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
+                    screens.forEach { screen ->
+                        NavigationBarItem(
+                            icon = { Icon(screen.icon, contentDescription = screen.title) },
+                            label = { Text(screen.title) },
+                            selected = currentRoute == screen.route,
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = MaterialTheme.colorScheme.primary,
+                                selectedTextColor = MaterialTheme.colorScheme.primary,
+                                indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                            ),
+                            onClick = {
+                                navController.navigate(screen.route) {
+                                    popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                    launchSingleTop = true
+                                    restoreState = true
+                                }
+                            }
+                        )
                     }
                 }
             }
-        ) { innerPadding ->
-            NavHost(
-                navController = navController,
-                startDestination = startDestination,
-                modifier = Modifier.padding(innerPadding)
-            ) {
-                composable("welcome") {
-                    WelcomeScreen(
-                        onGetStartedClick = {
-                            PreferenceManager.setFirstLaunchCompleted(context)
-                            navController.navigate(Screen.Dashboard.route) {
-                                popUpTo("welcome") { inclusive = true }
-                            }
+        }
+    ) { innerPadding ->
+        NavHost(
+            navController = navController,
+            startDestination = startDestination,
+            modifier = Modifier.padding(innerPadding)
+        ) {
+            composable("welcome") {
+                WelcomeScreen(
+                    onGetStartedClick = {
+                        PreferenceManager.setFirstLaunchCompleted(context)
+                        navController.navigate(Screen.Dashboard.route) {
+                            popUpTo("welcome") { inclusive = true }
                         }
-                    )
-                }
-                
-                composable(Screen.Dashboard.route) { 
-                    DashboardScreen(viewModel, onNavigateToSimulator = { navController.navigate("simulator") }) 
-                }
-                composable(Screen.Rules.route) { 
-                    RulesScreen(
-                        viewModel = viewModel,
-                        onEditRule = { ruleId -> navController.navigate("rule_editor/$ruleId/0") }
-                    ) 
-                }
-                composable(Screen.Contacts.route) { ContactsScreen(viewModel) }
-                composable(Screen.Settings.route) { SettingsScreen() }
-                
-                composable("simulator") { 
-                    SimulatorScreen(viewModel, onBack = { navController.popBackStack() }) 
-                }
+                    }
+                )
+            }
+            
+            composable(Screen.Dashboard.route) { 
+                DashboardScreen(viewModel, onNavigateToSimulator = { navController.navigate("simulator") }) 
+            }
+            composable(Screen.Rules.route) { 
+                RulesScreen(
+                    viewModel = viewModel,
+                    onEditRule = { ruleId -> navController.navigate("rule_editor/$ruleId/0") }
+                ) 
+            }
+            composable(Screen.Contacts.route) { ContactsScreen(viewModel) }
+            composable(Screen.Settings.route) { SettingsScreen() }
+            
+            composable("simulator") { 
+                SimulatorScreen(viewModel, onBack = { navController.popBackStack() }) 
+            }
 
-                composable(
-                    route = "rule_editor/{ruleId}/{parentId}",
-                    arguments = listOf(
-                        navArgument("ruleId") { type = NavType.LongType },
-                        navArgument("parentId") { type = NavType.LongType }
-                    )
-                ) { backStackEntry ->
-                    val ruleId = backStackEntry.arguments?.getLong("ruleId") ?: 0L
-                    val parentId = backStackEntry.arguments?.getLong("parentId") ?: 0L
-                    
-                    val existingRule = if (ruleId == 0L) null else viewModel.allRules.value.find { it.id == ruleId }
-                    val childRules = viewModel.allRules.value.filter { it.parentRuleId == ruleId }
-                    
-                    RuleEditorScreen(
-                        existingRule = existingRule,
-                        parentId = if (parentId == 0L) null else parentId,
-                        childRules = childRules,
-                        onBack = { navController.popBackStack() },
-                        onSave = { updatedRule ->
-                            viewModel.saveRule(updatedRule)
-                            navController.popBackStack()
-                        },
-                        onAddChildRule = { parentRuleId ->
-                            navController.navigate("rule_editor/0/$parentRuleId")
-                        },
-                        onEditChildRule = { childId ->
-                            navController.navigate("rule_editor/$childId/0") 
-                        }
-                    )
-                }
+            composable(
+                route = "rule_editor/{ruleId}/{parentId}",
+                arguments = listOf(
+                    navArgument("ruleId") { type = NavType.LongType },
+                    navArgument("parentId") { type = NavType.LongType }
+                )
+            ) { backStackEntry ->
+                val ruleId = backStackEntry.arguments?.getLong("ruleId") ?: 0L
+                val parentId = backStackEntry.arguments?.getLong("parentId") ?: 0L
+                
+                val existingRule = if (ruleId == 0L) null else viewModel.allRules.value.find { it.id == ruleId }
+                val childRules = viewModel.allRules.value.filter { it.parentRuleId == ruleId }
+                
+                RuleEditorScreen(
+                    existingRule = existingRule,
+                    parentId = if (parentId == 0L) null else parentId,
+                    childRules = childRules,
+                    onBack = { navController.popBackStack() },
+                    onSave = { updatedRule ->
+                        viewModel.saveRule(updatedRule)
+                        navController.popBackStack()
+                    },
+                    onAddChildRule = { parentRuleId ->
+                        navController.navigate("rule_editor/0/$parentRuleId")
+                    },
+                    onEditChildRule = { childId ->
+                        navController.navigate("rule_editor/$childId/0") 
+                    }
+                )
             }
         }
+    }
+
+    // --- THE BATTERY REMINDER DIALOG ---
+    if (showBatteryDialog) {
+        AlertDialog(
+            onDismissRequest = { /* Force them to click a button */ },
+            title = { Text("Battery Optimization is ON") },
+            text = { 
+                Text("Your phone is restricting background apps. To ensure auto-replies work reliably, please set battery usage to 'Unrestricted' in settings.") 
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showBatteryDialog = false
+                        try {
+                            val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+                            intent.data = Uri.parse("package:${context.packageName}")
+                            context.startActivity(intent)
+                        } catch (e: Exception) {
+                            val fallbackIntent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                            fallbackIntent.data = Uri.parse("package:${context.packageName}")
+                            context.startActivity(fallbackIntent)
+                        }
+                    }
+                ) {
+                    Text("Go to Settings")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        // Save preference so it never shows again
+                        PreferenceManager.setBatteryIgnored(context, true)
+                        showBatteryDialog = false
+                    }
+                ) {
+                    Text("Ignore", color = Color.Gray)
+                }
+            }
+        )
     }
 }
 
