@@ -5,7 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.PowerManager
 import android.provider.Settings
-import androidx.compose.foundation.BorderStroke // <--- ADDED THIS IMPORT
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -30,118 +30,11 @@ import androidx.compose.ui.unit.sp
 import com.example.whatsappautomation.data.AutomationRule
 import com.example.whatsappautomation.data.Contact
 
-// --- NEW: BATTERY OPTIMIZATION SCREEN ---
+// --- BATTERY OPTIMIZATION SCREEN (Legacy, no longer used for blocking) ---
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BatteryOptimizationScreen(onBack: () -> Unit, onRetry: () -> Unit) {
-    val context = LocalContext.current
-
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("AutoResponder for WA") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = Color.White,
-                    navigationIconContentColor = Color.White
-                )
-            )
-        }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .background(MaterialTheme.colorScheme.primary)
-                .padding(32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Text(
-                text = "Disable the battery optimization, remove background restrictions, and enable autostart for AutoResponder in the settings of your device.",
-                color = Color.White,
-                fontSize = 18.sp,
-                textAlign = TextAlign.Center,
-                fontWeight = FontWeight.Medium
-            )
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            Button(
-                onClick = {
-                    try {
-                        val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
-                        intent.data = Uri.parse("package:${context.packageName}")
-                        context.startActivity(intent)
-                    } catch (e: Exception) {
-                        val fallbackIntent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
-                        fallbackIntent.data = Uri.parse("package:${context.packageName}")
-                        context.startActivity(fallbackIntent)
-                    }
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F)),
-                shape = RoundedCornerShape(24.dp),
-                modifier = Modifier.width(200.dp).height(50.dp)
-            ) {
-                Text("SETTINGS", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            Text("+", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
-            
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Button(
-                onClick = {
-                    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
-                    intent.data = Uri.parse("package:${context.packageName}")
-                    context.startActivity(intent)
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F)),
-                shape = RoundedCornerShape(24.dp),
-                modifier = Modifier.width(200.dp).height(50.dp)
-            ) {
-                Text("SETTINGS", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-            }
-
-            Spacer(modifier = Modifier.height(32.dp))
-            
-            OutlinedButton(
-                onClick = onRetry,
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-                border = BorderStroke(1.dp, Color.White),
-                shape = RoundedCornerShape(24.dp),
-                modifier = Modifier.width(200.dp).height(50.dp)
-            ) {
-                Text("I've Disabled It", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-            }
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            Text(
-                text = "Can't find all settings or need further help?",
-                color = Color.White,
-                fontSize = 14.sp,
-                textAlign = TextAlign.Center
-            )
-            Text(
-                text = "https://dontkillmyapp.com/?app=WhatsAppAutomation",
-                color = Color.White,
-                fontSize = 14.sp,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.clickable {
-                    val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://dontkillmyapp.com/"))
-                    context.startActivity(browserIntent)
-                }
-            )
-        }
-    }
+    // ... (Keep the existing code for this screen, it's not used anymore since we use the dialog) ...
 }
 
 // --- DASHBOARD ---
@@ -357,12 +250,14 @@ fun RuleCard(rule: AutomationRule, onToggleClick: () -> Unit, onEditClick: () ->
     }
 }
 
-// --- SETTINGS ---
+// --- SETTINGS (Updated) ---
 @Composable
 fun SettingsScreen() {
-    var enableOriginalWA by remember { mutableStateOf(true) }
-    var enableWABusiness by remember { mutableStateOf(true) }
-    var enableMultiUser by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    
+    // Load saved preferences
+    var enableOriginalWA by remember { mutableStateOf(PreferenceManager.isWaOriginalEnabled(context)) }
+    var enableWABusiness by remember { mutableStateOf(PreferenceManager.isWaBusinessEnabled(context)) }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text("Settings", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
@@ -371,17 +266,14 @@ fun SettingsScreen() {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text("Version of WA", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                 Spacer(modifier = Modifier.height(8.dp))
-                SwitchRow("WhatsApp (Original)", enableOriginalWA) { enableOriginalWA = it }
-                SwitchRow("WhatsApp Business", enableWABusiness) { enableWABusiness = it }
-            }
-        }
-
-        Card(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text("Multi-User Support", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                Text("Reply to WA versions of other users on this device (Dual App).", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
-                Spacer(modifier = Modifier.height(8.dp))
-                SwitchRow("Enable Multi-User", enableMultiUser) { enableMultiUser = it }
+                SwitchRow("WhatsApp (Original)", enableOriginalWA) { 
+                    enableOriginalWA = it
+                    PreferenceManager.setWaOriginalEnabled(context, it) // Save instantly
+                }
+                SwitchRow("WhatsApp Business", enableWABusiness) { 
+                    enableWABusiness = it
+                    PreferenceManager.setWaBusinessEnabled(context, it) // Save instantly
+                }
             }
         }
     }
