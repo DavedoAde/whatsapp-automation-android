@@ -15,12 +15,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-enum class LeadCaptureState {
-    IDLE,
-    AWAITING_NAME,
-    AWAITING_CONFIRMATION
-}
-
 class AppViewModel(application: Application) : AndroidViewModel(application) {
     
     private val database = AppDatabase.getDatabase(application)
@@ -50,107 +44,99 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { ruleDao.deleteRuleById(rule.id) }
     }
 
-    // --- LEAD CAPTURE STATE MACHINE ---
-    private var currentLeadState = LeadCaptureState.IDLE
-    private var currentSimulatedMenuId: Long? = null
-    private var tempName: String = ""
-    private var activeRule: AutomationRule? = null
+    // --- SIMULATOR LOGIC (Shares BotStateManager with real service) ---
     private var currentSenderId = "+1234567890" 
 
     fun simulateMessage(message: String): String {
-        // 1. Handle the Lead Capture State Machine
-        when (currentLeadState) {
+        val allRulesList = allRules.value
+        
+        // 1. Handle Lead Capture State Machine
+        when (BotStateManager.currentLeadState) {
             LeadCaptureState.AWAITING_NAME -> {
-                tempName = RuleEngine.extractName(message)
-                currentLeadState = LeadCaptureState.AWAITING_CONFIRMATION
-                return activeRule?.confirmQuestion?.replace("{name}", tempName) ?: "Is your name $tempName? Reply YES or NO."
+                BotStateManager.tempName = RuleEngine.extractName(message)
+                BotStateManager.currentLeadState = LeadCaptureState.AWAITING_CONFIRMATION
+                return BotStateManager.activeRule?.confirmQuestion?.replace("{name}", BotStateManager.tempName) ?: "Is your name ${BotStateManager.tempName}? Reply YES or NO."
             }
             
             LeadCaptureState.AWAITING_CONFIRMATION -> {
                 val lowerMsg = message.trim().lowercase()
                 if (lowerMsg == "yes" || lowerMsg == "y") {
-                    // Save the contact!
                     viewModelScope.launch {
                         val newContact = Contact(
                             phoneNumber = currentSenderId, 
-                            name = tempName, 
+                            name = BotStateManager.tempName, 
                             sourceApp = "WhatsApp",
-                            tags = activeRule?.assignTag ?: ""
+                            tags = BotStateManager.activeRule?.assignTag ?: ""
                         )
                         contactDao.insertContact(newContact)
                         
                         val context = getApplication<Application>()
                         if (ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_CONTACTS) == PackageManager.PERMISSION_GRANTED) {
-                            PhoneContactManager.saveContactToPhone(context, tempName, currentSenderId)
+                            PhoneContactManager.saveContactToPhone(context, BotStateManager.tempName, currentSenderId)
                         }
                     }
                     
-                    currentLeadState = LeadCaptureState.IDLE
-                    val successMsg = activeRule?.successMessage?.replace("{name}", tempName) ?: "Thank you $tempName!"
+                    val successMsg = BotStateManager.activeRule?.successMessage?.replace("{name}", BotStateManager.tempName) ?: "Saved!"
                     
-                    // If the rule has a submenu, move into it so the next message triggers the link
-                    val allRulesList = allRules.value
-                    val hasSubMenu = allRulesList.any { it.parentRuleId == activeRule?.id }
+                    // Check for submenu
+                    val hasSubMenu = allRulesList.any { it.parentRuleId == BotStateManager.activeRule?.id }
                     if (hasSubMenu) {
-                        currentSimulatedMenuId = activeRule?.id
+                        BotStateManager.currentMenuId = BotStateManager.activeRule?.id
                     } else {
-                        currentSimulatedMenuId = null
+                        BotStateManager.currentMenuId = null
                     }
-                    activeRule = null
+                    
+                    BotStateManager.currentLeadState = LeadCaptureState.IDLE
+                    BotStateManager.activeRule = null
                     return successMsg
                     
                 } else if (lowerMsg == "no" || lowerMsg == "n") {
-                    currentLeadState = LeadCaptureState.AWAITING_NAME
-                    tempName = ""
-                    return activeRule?.retryQuestion ?: "No problem. What's your name again?"
+                    BotStateManager.currentLeadState = LeadCaptureState.AWAITING_NAME
+                    BotStateManager.tempName = ""
+                    return BotStateManager.activeRule?.retryQuestion ?: "No problem. What's your name again?"
                 } else {
-                    return "Please reply YES or NO. Is your name $tempName?"
+                    return "Please reply YES or NO. Is your name ${BotStateManager.tempName}?"
                 }
             }
-            LeadCaptureState.IDLE -> { /* Continue to normal rule matching */ }
+            LeadCaptureState.IDLE -> { /* Continue */ }
         }
 
-        // 2. If we are currently inside a submenu
-        val allRulesList = allRules.value
-        if (currentSimulatedMenuId != null) {
-            val childRules = allRulesList.filter { it.parentRuleId == currentSimulatedMenuId && it.isActive }
+        // 2. Submenu Routing
+        if (BotStateManager.currentMenuId != null) {
+            val childRules = allRulesList.filter { it.parentRuleId == BotStateManager.currentMenuId && it.isActive }
             val matchedChild = RuleEngine.findMatchingRule(message, childRules)
 
             if (matchedChild != null) {
                 val hasSubMenu = allRulesList.any { it.parentRuleId == matchedChild.id }
-                currentSimulatedMenuId = if (hasSubMenu) matchedChild.id else null
+                BotStateManager.currentMenuId = if (hasSubMenu) matchedChild.id else null
                 
                 if (matchedChild.askForName) {
-                    currentLeadState = LeadCaptureState.AWAITING_NAME
-                    activeRule = matchedChild
+                    BotStateManager.currentLeadState = LeadCaptureState.AWAITING_NAME
+                    BotStateManager.activeRule = matchedChild
                     return matchedChild.promptQuestion
                 }
                 return RuleEngine.getReplyText(matchedChild, number = currentSenderId)
             } else {
-                return "" // Stay silent if invalid option in submenu
+                return "" // Silent if invalid
             }
         }
 
-        // 3. Standard Top-Level Rules
+        // 3. Top Level Rules
         val topLevelRules = allRulesList.filter { it.parentRuleId == null }
         val matchedRule = RuleEngine.findMatchingRule(message, topLevelRules)
         
         return if (matchedRule != null) {
             val hasSubMenu = allRulesList.any { it.parentRuleId == matchedRule.id }
-            currentSimulatedMenuId = if (hasSubMenu) matchedRule.id else null
+            BotStateManager.currentMenuId = if (hasSubMenu) matchedRule.id else null
 
             if (matchedRule.askForName) {
-                currentLeadState = LeadCaptureState.AWAITING_NAME
-                activeRule = matchedRule
+                BotStateManager.currentLeadState = LeadCaptureState.AWAITING_NAME
+                BotStateManager.activeRule = matchedRule
                 return matchedRule.promptQuestion
             }
-            RuleRuleEngineReply(matchedRule)
+            RuleEngine.getReplyText(matchedRule, number = currentSenderId)
         } else {
-            "" // Stay completely silent
+            "" 
         }
-    }
-
-    private fun RuleRuleEngineReply(rule: AutomationRule): String {
-         return RuleEngine.getReplyText(rule, number = currentSenderId)
     }
 }
