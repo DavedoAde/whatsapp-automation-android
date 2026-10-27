@@ -1,6 +1,5 @@
 package com.example.whatsappautomation
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -151,8 +150,6 @@ fun RuleEditorScreen(
         ) {
             // CARD 1: Received Message
             EditorCard(title = "Received message") {
-                
-                // Row 1: Trigger and Catch-All button
                 Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     OutlinedTextField(
                         value = trigger,
@@ -174,7 +171,6 @@ fun RuleEditorScreen(
                 
                 Spacer(modifier = Modifier.height(12.dp))
                 
-                // Row 2: Target Dropdown (Cleanly separated)
                 Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text("Send to:", fontSize = 14.sp, modifier = Modifier.padding(end = 8.dp))
                     Box {
@@ -192,7 +188,6 @@ fun RuleEditorScreen(
                 
                 Spacer(modifier = Modifier.height(12.dp))
                 
-                // Match Types
                 MatchOptionRow("Exact match", "Ignores case and punctuation", "EXACT", matchType) { matchType = it }
                 MatchOptionRow("Similarity match", "Triggers if spelling is close (e.g., 'helo')", "SIMILARITY", matchType) { matchType = it }
                 MatchOptionRow("Contains (pattern matching)", "Use * for anything, // for OR", "PATTERN", matchType) { matchType = it }
@@ -318,7 +313,7 @@ fun RuleEditorScreen(
             showValidationError = false
         }
     }
-}
+} // <--- THIS BRACE WAS LIKELY MISSING IN YOUR COPY
 
 @Composable
 fun MatchOptionRow(title: String, desc: String, type: String, currentType: String, onSelect: (String) -> Unit) {
@@ -353,4 +348,23 @@ fun ConditionSwitchRow(title: String, checked: Boolean, onCheckedChange: (Boolea
 
 @Composable
 fun EditorCard(title: String, titleColor: Color = MaterialTheme.colorScheme.primary, content: @Composable ColumnScope.() -> Unit) {
-    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Material
+    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(text = title, fontWeight = FontWeight.Bold, color = titleColor, fontSize = 18.sp)
+            Spacer(modifier = Modifier.height(12.dp))
+            content()
+        }
+    }
+}
+
+fun getInfoText(type: String): String {
+    return when (type) {
+        "EXACT" -> "Ignores accents, upper and lower case, and redundant spaces. Also ignores emojis and punctuation if they are not used in your rule."
+        "SIMILARITY" -> "Replies to different variations of a message. The app uses an algorithm to compute a confidence score. It can only match messages with a similar length."
+        "PATTERN" -> "Reply if... message starts with 'Test': test*\n...message ends with 'Test': *test\n...message contains 'Test': *test*\n\n* stands for [anything].\n// stands for [or]."
+        "REGEX" -> "This option allows complex conditions using regular expressions. Search the internet for 'java regular expression' for a reference."
+        "WELCOME" -> "Replies to the first message received from a NON-CONTACT since the app is active. You can activate it for groups, too."
+        else -> ""
+    }
+}
+// END OF FILE
