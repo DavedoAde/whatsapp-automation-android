@@ -30,9 +30,12 @@ import com.example.whatsappautomation.data.AutomationRule
 import com.example.whatsappautomation.data.Contact
 
 // --- NEW: BATTERY OPTIMIZATION SCREEN ---
+
+// ... (Imports remain the same) ...
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun BatteryOptimizationScreen(onBack: () -> Unit) {
+fun BatteryOptimizationScreen(onBack: () -> Unit, onRetry: () -> Unit) {
     val context = LocalContext.current
 
     Scaffold(
@@ -78,13 +81,12 @@ fun BatteryOptimizationScreen(onBack: () -> Unit) {
                         intent.data = Uri.parse("package:${context.packageName}")
                         context.startActivity(intent)
                     } catch (e: Exception) {
-                        // Fallback for restrictive phones
                         val fallbackIntent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
                         fallbackIntent.data = Uri.parse("package:${context.packageName}")
                         context.startActivity(fallbackIntent)
                     }
                 },
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F)), // Red button
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F)),
                 shape = RoundedCornerShape(24.dp),
                 modifier = Modifier.width(200.dp).height(50.dp)
             ) {
@@ -99,7 +101,6 @@ fun BatteryOptimizationScreen(onBack: () -> Unit) {
 
             Button(
                 onClick = {
-                    // Same fallback in case they need to manually find it
                     val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
                     intent.data = Uri.parse("package:${context.packageName}")
                     context.startActivity(intent)
@@ -109,6 +110,19 @@ fun BatteryOptimizationScreen(onBack: () -> Unit) {
                 modifier = Modifier.width(200.dp).height(50.dp)
             ) {
                 Text("SETTINGS", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
+            
+            // NEW: Retry button for manual check
+            OutlinedButton(
+                onClick = onRetry,
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                border = BorderStroke(1.dp, Color.White),
+                shape = RoundedCornerShape(24.dp),
+                modifier = Modifier.width(200.dp).height(50.dp)
+            ) {
+                Text("I've Disabled It", fontWeight = FontWeight.Bold, fontSize = 16.sp)
             }
 
             Spacer(modifier = Modifier.height(32.dp))
@@ -133,6 +147,7 @@ fun BatteryOptimizationScreen(onBack: () -> Unit) {
     }
 }
 
+// ... (Rest of Screens.kt remains the same) ...
 // --- DASHBOARD ---
 @Composable
 fun DashboardScreen(viewModel: AppViewModel, onNavigateToSimulator: () -> Unit) {
