@@ -46,14 +46,8 @@ fun SimulatorScreen(viewModel: AppViewModel, onBack: () -> Unit) {
             TopAppBar(
                 title = { 
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Surface(
-                            shape = CircleShape,
-                            color = Color(0xFF00A884),
-                            modifier = Modifier.size(36.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Text("🤖", fontSize = 20.sp)
-                            }
+                        Surface(shape = CircleShape, color = Color(0xFF00A884), modifier = Modifier.size(36.dp)) {
+                            Box(contentAlignment = Alignment.Center) { Text("🤖", fontSize = 20.sp) }
                         }
                         Spacer(modifier = Modifier.width(12.dp))
                         Column {
@@ -72,11 +66,7 @@ fun SimulatorScreen(viewModel: AppViewModel, onBack: () -> Unit) {
         },
         bottomBar = {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color(0xFF1F2C34))
-                    .padding(8.dp)
-                    .imePadding(), // This keeps the input box above the keyboard
+                modifier = Modifier.fillMaxWidth().background(Color(0xFF1F2C34)).padding(8.dp).imePadding(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 OutlinedTextField(
@@ -102,7 +92,11 @@ fun SimulatorScreen(viewModel: AppViewModel, onBack: () -> Unit) {
                             inputMessage = ""
 
                             val botReplyText = viewModel.simulateMessage(userText)
-                            messages.add(ChatMessage(botReplyText, false))
+                            
+                            // SILENT MODE: Only add a bubble if the bot actually replies
+                            if (botReplyText.isNotBlank()) {
+                                messages.add(ChatMessage(botReplyText, false))
+                            }
                         }
                     },
                     containerColor = Color(0xFF00A884),
@@ -114,12 +108,7 @@ fun SimulatorScreen(viewModel: AppViewModel, onBack: () -> Unit) {
             }
         }
     ) { padding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .background(Color(0xFF0B141A))
-        ) {
+        Box(modifier = Modifier.fillMaxSize().padding(padding).background(Color(0xFF0B141A))) {
             LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp),
@@ -138,24 +127,11 @@ fun SimulatorScreen(viewModel: AppViewModel, onBack: () -> Unit) {
 fun ChatBubble(message: ChatMessage) {
     val bubbleColor = if (message.isUser) Color(0xFF005C4B) else Color(0xFF202C33)
     val alignment = if (message.isUser) Alignment.End else Alignment.Start
-    val shape = if (message.isUser) {
-        RoundedCornerShape(16.dp, 16.dp, 0.dp, 16.dp)
-    } else {
-        RoundedCornerShape(16.dp, 16.dp, 16.dp, 0.dp)
-    }
+    val shape = if (message.isUser) RoundedCornerShape(16.dp, 16.dp, 0.dp, 16.dp) else RoundedCornerShape(16.dp, 16.dp, 16.dp, 0.dp)
 
     Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = alignment) {
-        Box(
-            modifier = Modifier
-                .background(bubbleColor, shape)
-                .padding(12.dp)
-                .widthIn(max = 300.dp)
-        ) {
-            Text(
-                text = message.text,
-                color = Color(0xFFE9EDEF),
-                fontSize = 15.sp
-            )
+        Box(modifier = Modifier.background(bubbleColor, shape).padding(12.dp).widthIn(max = 300.dp)) {
+            Text(text = message.text, color = Color(0xFFE9EDEF), fontSize = 15.sp)
         }
     }
 }
