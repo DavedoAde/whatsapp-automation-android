@@ -1,17 +1,24 @@
 package com.example.whatsappautomation
 
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Bundle
+import android.provider.Settings
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp // <--- THIS WAS MISSING
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -53,7 +60,23 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
         Screen.Settings.route
     )
 
+    val context = LocalContext.current
     val isAutomationActive by viewModel.isAutomationActive.collectAsState()
+    
+    // --- PERMISSION STATE & LOGIC ---
+    var showPermissionDialog by remember { mutableStateOf(false) }
+    
+    val contactPermissionLauncher = rememberLauncherForActivityResult(contract = ActivityResultContracts.RequestPermission()) { /* Handle result if needed */ }
+    
+    // Check if Notification Access is granted
+    fun hasNotificationAccess(): Boolean {
+        val enabledListeners = NotificationManagerCompat.getEnabledListenerPackages(context)
+        return enabledListeners.contains(context.packageName)
+    }
+
+    fun hasContactAccess(): Boolean {
+        return ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_CONTACTS) == PackageManager.PERMISSION_GRANTED
+    }
 
     Scaffold(
         topBar = {
@@ -61,10 +84,20 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
                 TopAppBar(
                     title = { Text("WhatsApp Automation", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleLarge) },
                     actions = {
-                        // Master ON/OFF Switch
+                        // Master ON/OFF Switch with Permission Gate
                         Switch(
                             checked = isAutomationActive,
-                            onCheckedChange = { viewModel.toggleAutomation(it) },
+                            onCheckedChange = { isChecked ->
+                                if (isChecked) {
+                                    if (hasNotificationAccess() && hasContactAccess()) {
+                                        viewModel.toggleAutomation(true)
+                                    } else {
+                                        showPermissionDialog = true
+                                    }
+                                } else {
+                                    viewModel.toggleAutomation(false)
+                                }
+                            },
                             modifier = Modifier.padding(end = 16.dp),
                             colors = SwitchDefaults.colors(
                                 checkedThumbColor = MaterialTheme.colorScheme.primary,
@@ -155,16 +188,50 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
             }
         }
     }
+
+    // --- THE POPUP DIALOG FOR MISSING PERMISSIONS ---
+    if (showPermissionDialog) {
+        AlertDialog(
+            onDismissRequest = { showPermissionDialog = false },
+            title = { Text("Permissions Required") },
+            text = { 
+                Text("To turn on the AutoResponder, you must grant Notification Access and Contact Access so the app can read messages and save leads.") 
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showPermissionDialog = false
+                        // Open Notification Settings first
+                        val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
+                        context.startActivity(intent)
+                    }
+                ) {
+                    Text("Grant Notification Access")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showPermissionDialog = false
+                        // Open Contact Permission Dialog
+                        contactPermissionLauncher.launch(Manifest.permission.WRITE_CONTACTS)
+                    }
+                ) {
+                    Text("Grant Contact Access")
+                }
+            }
+        )
+    }
 }
 
-// --- NEW PREMIUM THEME COLORS ---
+// --- PREMIUM THEME COLORS ---
 @Composable
 fun WhatsAppAutomationTheme(content: @Composable () -> Unit) {
-    val deepObsidian = Color(0xFF0B141A)  // Very dark background
-    val lighterCard = Color(0xFF1F2C34)   // Card surface color
-    val accentGreen = Color(0xFF25D366)   // Vibrant green
-    val textLight = Color(0xFFE9EDEF)     // White-ish text
-    val textMuted = Color(0xFF8696A0)     // Grey text
+    val deepObsidian = Color(0xFF0B141A)  
+    val lighterCard = Color(0xFF1F2C34)   
+    val accentGreen = Color(0xFF25D366)   
+    val textLight = Color(0xFFE9EDEF)     
+    val textMuted = Color(0xFF8696A0)     
 
     MaterialTheme(
         colorScheme = darkColorScheme(
@@ -173,7 +240,7 @@ fun WhatsAppAutomationTheme(content: @Composable () -> Unit) {
             surface = lighterCard,
             onBackground = textLight,
             onSurface = textLight,
-            tertiary = Color(0xFFBB86FC), // Soft purple for Tags
+            tertiary = Color(0xFFBB86FC), 
             onTertiary = Color.Black
         ),
         content = content
