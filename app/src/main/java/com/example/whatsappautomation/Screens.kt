@@ -6,18 +6,21 @@ import android.content.pm.PackageManager
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -26,7 +29,278 @@ import androidx.core.content.ContextCompat
 import com.example.whatsappautomation.data.AutomationRule
 import com.example.whatsappautomation.data.Contact
 
-// --- NEW SETTINGS SCREEN ---
+// --- DASHBOARD ---
+@Composable
+fun DashboardScreen(viewModel: AppViewModel, onNavigateToSimulator: () -> Unit) {
+    val activeRulesCount by viewModel.activeRulesCount.collectAsState()
+    val totalContactsCount by viewModel.totalContactsCount.collectAsState()
+    
+    val context = LocalContext.current
+    var hasContactPermission by remember {
+        mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_CONTACTS) == PackageManager.PERMISSION_GRANTED)
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(contract = ActivityResultContracts.RequestPermission()) { isGranted ->
+        hasContactPermission = isGranted
+    }
+
+    Column(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        
+        // Stats Row
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            StatCard(title = "Active Rules", value = "$activeRulesCount", icon = Icons.Default.Rule, modifier = Modifier.weight(1f))
+            StatCard(title = "Contacts", value = "$totalContactsCount", icon = Icons.Default.People, modifier = Modifier.weight(1f))
+        }
+
+        // Permission Checklist
+        Text("System Status", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 8.dp))
+        
+        PermissionCard(
+            title = "Notification Access",
+            desc = "Required to read WhatsApp messages.",
+            isGranted = true, // Assuming granted if app is working, but you can add a real check here
+            onGrantClick = {
+                val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
+                context.startActivity(intent)
+            }
+        )
+
+        PermissionCard(
+            title = "Contact Access",
+            desc = "Required to automatically save leads.",
+            isGranted = hasContactPermission,
+            onGrantClick = {
+                permissionLauncher.launch(Manifest.permission.WRITE_CONTACTS)
+            }
+        )
+
+        Spacer(modifier = Modifier.weight(1f))
+
+        // Big Simulator Button
+        Button(
+            onClick = onNavigateToSimulator, 
+            modifier = Modifier.fillMaxWidth().height(56.dp),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Icon(Icons.Default.Chat, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
+            Text("Open Chat Simulator", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+@Composable
+fun StatCard(title: String, value: String, icon: androidx.compose.ui.graphics.vector.ImageVector, modifier: Modifier = Modifier) {
+    Card(modifier = modifier, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(value, fontSize = 28.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+            Text(title, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
+        }
+    }
+}
+
+@Composable
+fun PermissionCard(title: String, desc: String, isGranted: Boolean, onGrantClick: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth().clickable { if (!isGranted) onGrantClick() },
+        colors = CardDefaults.cardColors(containerColor = if (isGranted) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.errorContainer)
+    ) {
+        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                imageVector = if (isGranted) Icons.Default.CheckCircle else Icons.Default.Warning,
+                contentDescription = null,
+                tint = if (isGranted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+            )
+            Spacer(modifier = Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(title, fontWeight = FontWeight.Bold, color = if (isGranted) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onErrorContainer)
+                Text(desc, fontSize = 12.sp, color = if (isGranted) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f))
+            }
+            if (!isGranted) {
+                Text("Grant", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+// --- CONTACTS (CRM) ---
+@Composable
+fun ContactsScreen(viewModel: AppViewModel) {
+    val contacts by viewModel.allContacts.collectAsState()
+    var searchQuery by remember { mutableStateOf("") }
+
+    val filteredContacts = contacts.filter { 
+        it.name.contains(searchQuery, ignoreCase = true) || it.phoneNumber.contains(searchQuery)
+    }
+
+    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+        OutlinedTextField(
+            value = searchQuery,
+            onValueChange = { searchQuery = it },
+            label = { Text("Search contacts...") },
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp)
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+
+        if (filteredContacts.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("No contacts found.", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
+            }
+        } else {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(filteredContacts) { contact ->
+                    ContactCard(contact)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ContactCard(contact: Contact) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            // Letter Avatar
+            Box(
+                modifier = Modifier.size(48.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = if (contact.name.isNotBlank()) contact.name.first().uppercase() else "?",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+            Spacer(modifier = Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(contact.name, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.onSurface)
+                Text(contact.phoneNumber, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
+                
+                if (contact.tags.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        contact.tags.split(",").forEach { tag ->
+                            Surface(shape = RoundedCornerShape(4.dp), color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.2f)) {
+                                Text(
+                                    text = tag.trim(), 
+                                    fontSize = 10.sp, 
+                                    color = MaterialTheme.colorScheme.tertiary, 
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// --- RULES ---
+@Composable
+fun RulesScreen(viewModel: AppViewModel, onEditRule: (Long) -> Unit) {
+    val allRules by viewModel.allRules.collectAsState()
+    val topLevelRules = allRules.filter { it.parentRuleId == null }
+    var ruleToDelete by remember { mutableStateOf<AutomationRule?>(null) }
+    var searchQuery by remember { mutableStateOf("") }
+
+    val filteredRules = topLevelRules.filter { 
+        it.name.contains(searchQuery, ignoreCase = true) || it.triggerKeyword.contains(searchQuery, ignoreCase = true)
+    }
+
+    Box(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+        Column {
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                label = { Text("Search rules...") },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+
+            if (filteredRules.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("No rules found.\nTap + to create one.", textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                }
+            } else {
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxSize()) {
+                    items(filteredRules) { rule ->
+                        RuleCard(
+                            rule = rule, 
+                            onToggleClick = { viewModel.toggleRuleActiveState(rule) },
+                            onEditClick = { onEditRule(rule.id) }, 
+                            onDeleteClick = { ruleToDelete = rule }
+                        )
+                    }
+                }
+            }
+        }
+
+        FloatingActionButton(
+            onClick = { onEditRule(0L) }, 
+            modifier = Modifier.align(Alignment.BottomEnd).padding(bottom = 16.dp, end = 8.dp), 
+            containerColor = MaterialTheme.colorScheme.primary
+        ) {
+            Icon(Icons.Default.Add, contentDescription = "Add Rule")
+        }
+    }
+
+    if (ruleToDelete != null) {
+        AlertDialog(
+            onDismissRequest = { ruleToDelete = null },
+            title = { Text("Delete Rule?") },
+            text = { Text("Are you sure you want to delete '${ruleToDelete?.name}'?") },
+            confirmButton = {
+                TextButton(onClick = { viewModel.deleteRule(ruleToDelete!!); ruleToDelete = null }, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Delete") }
+            },
+            dismissButton = { TextButton(onClick = { ruleToDelete = null }) { Text("Cancel") } }
+        )
+    }
+}
+
+@Composable
+fun RuleCard(rule: AutomationRule, onToggleClick: () -> Unit, onEditClick: () -> Unit, onDeleteClick: () -> Unit) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                Text(rule.name, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.onSurface)
+                Switch(
+                    checked = rule.isActive, 
+                    onCheckedChange = { onToggleClick() },
+                    colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary)
+                )
+            }
+            
+            Row(modifier = Modifier.padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (rule.askForName) {
+                    Surface(shape = RoundedCornerShape(4.dp), color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.2f)) {
+                        Text("Lead Capture", fontSize = 10.sp, color = MaterialTheme.colorScheme.tertiary, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                    }
+                }
+                if (rule.assignTag.isNotBlank()) {
+                    Surface(shape = RoundedCornerShape(4.dp), color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)) {
+                        Text("Tag: ${rule.assignTag}", fontSize = 10.sp, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                    }
+                }
+            }
+
+            Text("Trigger: '${rule.triggerKeyword}' (${rule.matchType})", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
+
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                IconButton(onClick = onEditClick) { Icon(Icons.Default.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.primary) }
+                IconButton(onClick = onDeleteClick) { Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error) }
+            }
+        }
+    }
+}
+
+// --- SETTINGS ---
 @Composable
 fun SettingsScreen() {
     var enableOriginalWA by remember { mutableStateOf(true) }
@@ -58,191 +332,8 @@ fun SettingsScreen() {
 
 @Composable
 fun SwitchRow(title: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
         Text(title, fontSize = 14.sp)
         Switch(checked = checked, onCheckedChange = onCheckedChange)
-    }
-}
-
-// --- DASHBOARD ---
-@Composable
-fun DashboardScreen(viewModel: AppViewModel, onNavigateToSimulator: () -> Unit) {
-    val isAutomationActive by viewModel.isAutomationActive.collectAsState()
-    val activeRulesCount by viewModel.activeRulesCount.collectAsState()
-    val totalContactsCount by viewModel.totalContactsCount.collectAsState()
-    
-    val context = LocalContext.current
-    var hasContactPermission by remember {
-        mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_CONTACTS) == PackageManager.PERMISSION_GRANTED)
-    }
-
-    val permissionLauncher = rememberLauncherForActivityResult(contract = ActivityResultContracts.RequestPermission()) { isGranted ->
-        hasContactPermission = isGranted
-    }
-
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text("Dashboard", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-        
-        Card(modifier = Modifier.fillMaxWidth()) {
-            Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Column {
-                    Text(text = if (isAutomationActive) "Automation is ON" else "Automation is OFF", fontWeight = FontWeight.Bold, color = if (isAutomationActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
-                    Text("Monitoring WhatsApp", fontSize = 12.sp)
-                }
-                Switch(checked = isAutomationActive, onCheckedChange = { viewModel.toggleAutomation(it) })
-            }
-        }
-
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            Card(modifier = Modifier.weight(1f)) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Active Rules", fontSize = 12.sp)
-                    Text("$activeRulesCount", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                }
-            }
-            Card(modifier = Modifier.weight(1f)) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Contacts", fontSize = 12.sp)
-                    Text("$totalContactsCount", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                }
-            }
-        }
-
-        if (!hasContactPermission) {
-            Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Contacts Permission Required", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onErrorContainer)
-                    Text("Grant access to save new leads to your phone's address book.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onErrorContainer)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Button(onClick = { permissionLauncher.launch(Manifest.permission.WRITE_CONTACTS) }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) {
-                        Text("Grant Contact Access")
-                    }
-                }
-            }
-        }
-
-        Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text("Notification Access Required", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSecondaryContainer)
-                Text("Grant Notification Access so the app can read WhatsApp messages.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSecondaryContainer)
-                Spacer(modifier = Modifier.height(8.dp))
-                Button(
-                    onClick = {
-                        val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
-                        context.startActivity(intent)
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
-                ) {
-                    Text("Open Notification Settings")
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-        Button(onClick = onNavigateToSimulator, modifier = Modifier.fillMaxWidth()) {
-            Text("Open Chat Simulator")
-        }
-    }
-}
-
-@Composable
-fun ContactsScreen(viewModel: AppViewModel) {
-    val contacts by viewModel.allContacts.collectAsState()
-
-    Box(modifier = Modifier.fillMaxSize()) {
-        if (contacts.isEmpty()) {
-            Text("No contacts captured yet.\nUse the Simulator to test the flow.", modifier = Modifier.align(Alignment.Center), fontSize = 16.sp)
-        } else {
-            LazyColumn(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(contacts) { contact ->
-                    ContactCard(contact)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun ContactCard(contact: Contact) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f), modifier = Modifier.size(48.dp)) {
-                Icon(imageVector = Icons.Default.Person, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(8.dp))
-            }
-            Spacer(modifier = Modifier.width(16.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(contact.name, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.onSurface)
-                Text("Phone: ${contact.phoneNumber}", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
-                
-                if (contact.tags.isNotBlank()) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Surface(shape = MaterialTheme.shapes.small, color = MaterialTheme.colorScheme.tertiary) {
-                        Text(
-                            text = contact.tags, 
-                            fontSize = 10.sp, 
-                            color = MaterialTheme.colorScheme.onTertiary, 
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun RulesScreen(viewModel: AppViewModel, onEditRule: (Long) -> Unit) {
-    val allRules by viewModel.allRules.collectAsState()
-    val topLevelRules = allRules.filter { it.parentRuleId == null }
-    var ruleToDelete by remember { mutableStateOf<AutomationRule?>(null) }
-
-    Box(modifier = Modifier.fillMaxSize()) {
-        if (topLevelRules.isEmpty()) {
-            Text("No rules created yet.\nTap + to add one.", modifier = Modifier.align(Alignment.Center), fontSize = 16.sp)
-        } else {
-            LazyColumn(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(topLevelRules) { rule ->
-                    RuleCard(rule = rule, onEditClick = { onEditRule(rule.id) }, onDeleteClick = { ruleToDelete = rule })
-                }
-            }
-        }
-
-        FloatingActionButton(onClick = { onEditRule(0L) }, modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp), containerColor = MaterialTheme.colorScheme.primary) {
-            Icon(Icons.Default.Add, contentDescription = "Add Rule")
-        }
-    }
-
-    if (ruleToDelete != null) {
-        AlertDialog(
-            onDismissRequest = { ruleToDelete = null },
-            title = { Text("Delete Rule?") },
-            text = { Text("Are you sure you want to delete '${ruleToDelete?.name}'?") },
-            confirmButton = {
-                TextButton(onClick = { viewModel.deleteRule(ruleToDelete!!); ruleToDelete = null }, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Delete") }
-            },
-            dismissButton = { TextButton(onClick = { ruleToDelete = null }) { Text("Cancel") } }
-        )
-    }
-}
-
-@Composable
-fun RuleCard(rule: AutomationRule, onEditClick: () -> Unit, onDeleteClick: () -> Unit) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(rule.name, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.primary)
-                Text(text = if (rule.askForName) "Lead Capture: ON" else "Standard Reply", fontSize = 12.sp, color = if (rule.askForName) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary.copy(alpha = 0.7f))
-                if (rule.assignTag.isNotBlank()) {
-                    Text("Tag: ${rule.assignTag}", fontSize = 12.sp, color = MaterialTheme.colorScheme.tertiary)
-                }
-                Text("Match: ${rule.matchType}", fontSize = 12.sp, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f))
-                Spacer(modifier = Modifier.height(4.dp))
-                Text("Trigger: '${rule.triggerKeyword}'", fontSize = 14.sp)
-            }
-            Row {
-                IconButton(onClick = onEditClick) { Icon(Icons.Default.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.primary) }
-                IconButton(onClick = onDeleteClick) { Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error) }
-            }
-        }
     }
 }
