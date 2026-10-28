@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -27,7 +28,7 @@ import androidx.compose.ui.unit.sp
 import com.example.whatsappautomation.data.ActivityLog
 import com.example.whatsappautomation.data.AutomationRule
 import com.example.whatsappautomation.data.Contact
-import kotlinx.coroutines.launch // <--- THIS WAS MISSING
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -69,11 +70,9 @@ fun ContactsScreen(viewModel: AppViewModel) {
     var showPauseMenuForContact by remember { mutableStateOf<Contact?>(null) }
     var showIgnoreConfirmForContact by remember { mutableStateOf<Contact?>(null) }
     
-    // Snackbar for export success
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
-    // CSV Export Launcher
     val createDocumentLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("text/csv")
     ) { uri: Uri? ->
@@ -83,13 +82,9 @@ fun ContactsScreen(viewModel: AppViewModel) {
                 context.contentResolver.openOutputStream(uri)?.use { outputStream ->
                     outputStream.write(csvData.toByteArray())
                 }
-                scope.launch {
-                    snackbarHostState.showSnackbar("Contacts exported successfully!")
-                }
+                scope.launch { snackbarHostState.showSnackbar("Contacts exported successfully!") }
             } catch (e: Exception) {
-                scope.launch {
-                    snackbarHostState.showSnackbar("Error exporting: ${e.message}")
-                }
+                scope.launch { snackbarHostState.showSnackbar("Error exporting: ${e.message}") }
             }
         }
     }
@@ -102,7 +97,6 @@ fun ContactsScreen(viewModel: AppViewModel) {
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
-            
             Row(verticalAlignment = Alignment.CenterVertically) {
                 OutlinedTextField(
                     value = searchQuery,
@@ -113,14 +107,10 @@ fun ContactsScreen(viewModel: AppViewModel) {
                     shape = RoundedCornerShape(12.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                // Export Button
                 IconButton(
                     onClick = { 
-                        if (contacts.isNotEmpty()) {
-                            createDocumentLauncher.launch("WhatsApp_Leads_${System.currentTimeMillis()}.csv") 
-                        } else {
-                            scope.launch { snackbarHostState.showSnackbar("No contacts to export.") }
-                        }
+                        if (contacts.isNotEmpty()) createDocumentLauncher.launch("WhatsApp_Leads_${System.currentTimeMillis()}.csv") 
+                        else scope.launch { snackbarHostState.showSnackbar("No contacts to export.") }
                     },
                     modifier = Modifier.background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), RoundedCornerShape(12.dp)).size(56.dp)
                 ) {
@@ -148,7 +138,6 @@ fun ContactsScreen(viewModel: AppViewModel) {
         }
     }
 
-    // Pause Duration Menu
     if (showPauseMenuForContact != null) {
         AlertDialog(
             onDismissRequest = { showPauseMenuForContact = null },
@@ -165,7 +154,6 @@ fun ContactsScreen(viewModel: AppViewModel) {
         )
     }
 
-    // Ignore Confirmation
     if (showIgnoreConfirmForContact != null) {
         val isCurrentlyIgnored = showIgnoreConfirmForContact!!.isIgnored
         AlertDialog(
@@ -345,27 +333,39 @@ fun RuleCard(rule: AutomationRule, onToggleClick: () -> Unit, onEditClick: () ->
 }
 
 // --- LOGS ---
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LogsScreen(viewModel: AppViewModel) {
+fun LogsScreen(viewModel: AppViewModel, onBack: () -> Unit) {
     val logs by viewModel.allLogs.collectAsState()
 
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text("Activity Logs", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-            TextButton(onClick = { viewModel.clearLogs() }) {
-                Text("Clear Logs", color = MaterialTheme.colorScheme.error)
-            }
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Activity Logs", fontWeight = FontWeight.Bold) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                actions = {
+                    TextButton(onClick = { viewModel.clearLogs() }) {
+                        Text("Clear", color = MaterialTheme.colorScheme.error)
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
+            )
         }
-        Spacer(modifier = Modifier.height(8.dp))
-
-        if (logs.isEmpty()) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("No activity yet.", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
-            }
-        } else {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(logs) { log ->
-                    LogCard(log)
+    ) { padding ->
+        Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
+            if (logs.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("No activity yet.", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
+                }
+            } else {
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(logs) { log ->
+                        LogCard(log)
+                    }
                 }
             }
         }
@@ -401,26 +401,39 @@ fun LogCard(log: ActivityLog) {
 }
 
 // --- SETTINGS ---
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen() {
+fun SettingsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     var enableOriginalWA by remember { mutableStateOf(PreferenceManager.isWaOriginalEnabled(context)) }
     var enableWABusiness by remember { mutableStateOf(PreferenceManager.isWaBusinessEnabled(context)) }
 
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text("Settings", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-        
-        Card(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text("Version of WA", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                Spacer(modifier = Modifier.height(8.dp))
-                SwitchRow("WhatsApp (Original)", enableOriginalWA) { 
-                    enableOriginalWA = it
-                    PreferenceManager.setWaOriginalEnabled(context, it)
-                }
-                SwitchRow("WhatsApp Business", enableWABusiness) { 
-                    enableWABusiness = it
-                    PreferenceManager.setWaBusinessEnabled(context, it)
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Settings", fontWeight = FontWeight.Bold) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
+            )
+        }
+    ) { padding ->
+        Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("Version of WA", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    SwitchRow("WhatsApp (Original)", enableOriginalWA) { 
+                        enableOriginalWA = it
+                        PreferenceManager.setWaOriginalEnabled(context, it)
+                    }
+                    SwitchRow("WhatsApp Business", enableWABusiness) { 
+                        enableWABusiness = it
+                        PreferenceManager.setWaBusinessEnabled(context, it)
+                    }
                 }
             }
         }
