@@ -551,7 +551,6 @@ fun SettingsScreen() {
                         currentSaveAccount = it; PreferenceManager.setSaveAccount(context, it); showSaveAccountDialog = false 
                     }
                     WaVersionOption("Google Account (Email)", "GOOGLE", currentSaveAccount) { 
-                        // FIXED: Removed the problematic runtime permission request. It just sets it now.
                         currentSaveAccount = "GOOGLE"
                         PreferenceManager.setSaveAccount(context, "GOOGLE")
                         showSaveAccountDialog = false
