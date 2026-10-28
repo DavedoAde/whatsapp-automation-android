@@ -1,7 +1,6 @@
 package com.example.whatsappautomation
 
 import android.Manifest
-import android.accounts.AccountManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -403,6 +402,15 @@ fun SettingsScreen() {
     val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
     val isBatteryOptimized = !powerManager.isIgnoringBatteryOptimizations(context.packageName)
 
+    // Permission Launcher for GET_ACCOUNTS
+    val accountsPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            showSaveAccountDialog = true
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -502,7 +510,13 @@ fun SettingsScreen() {
                 Spacer(modifier = Modifier.height(8.dp))
                 
                 Row(
-                    modifier = Modifier.fillMaxWidth().clickable { showSaveAccountDialog = true },
+                    modifier = Modifier.fillMaxWidth().clickable { 
+                        if (ContextCompat.checkSelfPermission(context, Manifest.permission.GET_ACCOUNTS) == PackageManager.PERMISSION_GRANTED) {
+                            showSaveAccountDialog = true
+                        } else {
+                            accountsPermissionLauncher.launch(Manifest.permission.GET_ACCOUNTS)
+                        }
+                    },
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -547,46 +561,37 @@ fun SettingsScreen() {
 
     // --- SAVE ACCOUNT DIALOG ---
     if (showSaveAccountDialog) {
-        // Fetch all Google Accounts
-        val accounts = remember { 
-            val am = AccountManager.get(context)
-            am.getAccountsByType("com.google").map { it.name } 
-        }
+        val accounts = remember { PhoneContactManager.getAccounts(context) }
 
         AlertDialog(
             onDismissRequest = { showSaveAccountDialog = false },
             title = { Text("Save Contacts To") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    WaVersionOption("Phone Memory", "LOCAL", currentSaveAccount) { 
-                        currentSaveAccount = "LOCAL"
-                        PreferenceManager.setSaveAccount(context, "LOCAL")
-                        showSaveAccountDialog = false 
-                    }
-                    
-                    Text("Google Accounts", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), modifier = Modifier.padding(top = 8.dp))
-                    
-                    if (accounts.isEmpty()) {
-                        Text("No Google accounts found on this device.", fontSize = 14.sp, color = MaterialTheme.colorScheme.error)
-                    } else {
-                        accounts.forEach { email ->
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.fillMaxWidth().clickable { 
+                    accounts.forEach { account ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth().clickable { 
+                                if (account.name == null) {
+                                    currentSaveAccount = "LOCAL"
+                                    currentGoogleAccount = ""
+                                    PreferenceManager.setSaveAccount(context, "LOCAL")
+                                    PreferenceManager.setGoogleAccountName(context, "")
+                                } else {
                                     currentSaveAccount = "GOOGLE"
-                                    currentGoogleAccount = email
+                                    currentGoogleAccount = account.name
                                     PreferenceManager.setSaveAccount(context, "GOOGLE")
-                                    PreferenceManager.setGoogleAccountName(context, email)
-                                    showSaveAccountDialog = false 
-                                }.padding(vertical = 8.dp)
-                            ) {
-                                RadioButton(
-                                    selected = currentSaveAccount == "GOOGLE" && currentGoogleAccount == email,
-                                    onClick = null
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(email, fontSize = 16.sp)
-                            }
+                                    PreferenceManager.setGoogleAccountName(context, account.name)
+                                }
+                                showSaveAccountDialog = false 
+                            }.padding(vertical = 8.dp)
+                        ) {
+                            RadioButton(
+                                selected = (account.name == null && currentSaveAccount == "LOCAL") || (account.name != null && currentGoogleAccount == account.name),
+                                onClick = null
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(if (account.name == null) "Phone Memory" else account.name, fontSize = 16.sp)
                         }
                     }
                 }
