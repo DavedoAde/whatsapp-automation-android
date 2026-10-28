@@ -19,6 +19,11 @@ object PhoneContactManager {
                 if (accounts.isNotEmpty()) {
                     accountName = accounts[0].name
                     accountType = accounts[0].type
+                    Log.d("PhoneContactManager", "Found Google Account: $accountName")
+                } else {
+                    Log.e("PhoneContactManager", "No Google Account found on device. Falling back to local.")
+                    // If they want Google but none is found, we might want to return false to let them know
+                    return false 
                 }
             }
 
@@ -56,9 +61,11 @@ object PhoneContactManager {
             )
 
             context.contentResolver.applyBatch(ContactsContract.AUTHORITY, ops)
+            Log.d("PhoneContactManager", "Contact saved successfully to $saveAccount")
             true
         } catch (e: Exception) {
             Log.e("PhoneContactManager", "Failed to save contact: ${e.message}")
+            e.printStackTrace()
             false
         }
     }
