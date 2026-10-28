@@ -9,10 +9,12 @@ object PreferenceManager {
     private const val KEY_AUTOMATION_ACTIVE = "is_automation_active"
     private const val KEY_BATTERY_IGNORED = "battery_ignored"
     
-    // NEW KEYS
     private const val KEY_WA_VERSION = "wa_version"
     private const val KEY_MULTI_USER = "multi_user_enabled"
     private const val KEY_NOTIFICATIONS_ENABLED = "notifications_enabled"
+    
+    // NEW KEY
+    private const val KEY_SAVE_ACCOUNT = "save_account"
 
     private fun getPrefs(context: Context): SharedPreferences {
         return context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
@@ -42,8 +44,6 @@ object PreferenceManager {
         getPrefs(context).edit().putBoolean(KEY_BATTERY_IGNORED, ignored).apply()
     }
 
-    // --- WA VERSION LOGIC ---
-    // Returns "ANY", "ORIGINAL", or "BUSINESS"
     fun getWaVersion(context: Context): String {
         return getPrefs(context).getString(KEY_WA_VERSION, "ANY") ?: "ANY"
     }
@@ -52,7 +52,6 @@ object PreferenceManager {
         getPrefs(context).edit().putString(KEY_WA_VERSION, version).apply()
     }
 
-    // --- NEW TOGGLES ---
     fun isMultiUserEnabled(context: Context): Boolean {
         return getPrefs(context).getBoolean(KEY_MULTI_USER, false)
     }
@@ -67,5 +66,14 @@ object PreferenceManager {
 
     fun setNotificationsEnabled(context: Context, enabled: Boolean) {
         getPrefs(context).edit().putBoolean(KEY_NOTIFICATIONS_ENABLED, enabled).apply()
+    }
+
+    // --- NEW SAVE ACCOUNT LOGIC ---
+    fun getSaveAccount(context: Context): String {
+        return getPrefs(context).getString(KEY_SAVE_ACCOUNT, "LOCAL") ?: "LOCAL"
+    }
+
+    fun setSaveAccount(context: Context, accountType: String) {
+        getPrefs(context).edit().putString(KEY_SAVE_ACCOUNT, accountType).apply()
     }
 }
