@@ -69,7 +69,7 @@ class WhatsAppListenerService : NotificationListenerService() {
         if (System.currentTimeMillis() - lastReply < 3000) return
 
         scope.launch {
-            // --- NEW: CHECK IF CONTACT IS PAUSED OR IGNORED ---
+            // Check pause and ignore
             val savedContact = database.contactDao().getContactByName(senderName)
             if (savedContact != null) {
                 if (savedContact.isIgnored) {
@@ -77,11 +77,10 @@ class WhatsAppListenerService : NotificationListenerService() {
                     return@launch
                 }
                 if (savedContact.pausedUntil > System.currentTimeMillis()) {
-                    Log.d(TAG, "$senderName is paused until ${savedContact.pausedUntil}. Skipping.")
+                    Log.d(TAG, "$senderName is paused. Skipping.")
                     return@launch
                 }
             }
-            // ---------------------------------------------------
 
             val result = processIncomingMessage(senderName, messageText)
             
@@ -215,7 +214,8 @@ class WhatsAppListenerService : NotificationListenerService() {
         val allRules = ruleDao.getAllRulesSync()
         val topLevelRules = allRules.filter { it.parentRuleId == null && it.isActive }
         
-        val matchedRule = RuleEngine.findMatchingRule(message, topLevelRules)
+        // FIXED: Pass applicationContext and enable checkConditions
+        val matchedRule = RuleEngine.findMatchingRule(applicationContext, message, topLevelRules, checkConditions = true)
         
         return if (matchedRule != null) {
             if (matchedRule.askForName) {
