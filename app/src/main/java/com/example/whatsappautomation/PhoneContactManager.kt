@@ -1,5 +1,6 @@
 package com.example.whatsappautomation
 
+import android.accounts.AccountManager
 import android.content.ContentProviderOperation
 import android.content.Context
 import android.provider.ContactsContract
@@ -8,15 +9,32 @@ import android.util.Log
 object PhoneContactManager {
     fun saveContactToPhone(context: Context, name: String, phoneNumber: String): Boolean {
         return try {
+            val saveAccount = PreferenceManager.getSaveAccount(context)
+            var accountName: String? = null
+            var accountType: String? = null
+
+            // If user selected Google, find the primary Google account
+            if (saveAccount == "GOOGLE") {
+                val accounts = AccountManager.get(context).getAccountsByType("com.google")
+                if (accounts.isNotEmpty()) {
+                    accountName = accounts[0].name
+                    accountType = accounts[0].type
+                }
+            }
+
             val ops = ArrayList<ContentProviderOperation>()
             
             // 1. Create the raw contact
-            ops.add(
-                ContentProviderOperation.newInsert(ContactsContract.RawContacts.CONTENT_URI)
-                    .withValue(ContactsContract.RawContacts.ACCOUNT_TYPE, null)
-                    .withValue(ContactsContract.RawContacts.ACCOUNT_NAME, null)
-                    .build()
-            )
+            val rawContactInsert = ContentProviderOperation.newInsert(ContactsContract.RawContacts.CONTENT_URI)
+            if (accountName != null && accountType != null) {
+                rawContactInsert.withValue(ContactsContract.RawContacts.ACCOUNT_TYPE, accountType)
+                rawContactInsert.withValue(ContactsContract.RawContacts.ACCOUNT_NAME, accountName)
+            } else {
+                // Default to local phone memory
+                rawContactInsert.withValue(ContactsContract.RawContacts.ACCOUNT_TYPE, null)
+                rawContactInsert.withValue(ContactsContract.RawContacts.ACCOUNT_NAME, null)
+            }
+            ops.add(rawContactInsert.build())
 
             // 2. Add the name
             ops.add(
