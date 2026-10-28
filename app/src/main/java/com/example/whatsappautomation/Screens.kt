@@ -3,6 +3,8 @@ package com.example.whatsappautomation
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -60,39 +62,86 @@ fun StatCard(title: String, value: String, icon: androidx.compose.ui.graphics.ve
 @Composable
 fun ContactsScreen(viewModel: AppViewModel) {
     val contacts by viewModel.allContacts.collectAsState()
+    val context = LocalContext.current
     var searchQuery by remember { mutableStateOf("") }
     
-    // Dialog states
     var showPauseMenuForContact by remember { mutableStateOf<Contact?>(null) }
     var showIgnoreConfirmForContact by remember { mutableStateOf<Contact?>(null) }
+    
+    // Snackbar for export success
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+
+    // CSV Export Launcher
+    val createDocumentLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("text/csv")
+    ) { uri: Uri? ->
+        if (uri != null) {
+            try {
+                val csvData = CSVExporter.generateCSV(contacts)
+                context.contentResolver.openOutputStream(uri)?.use { outputStream ->
+                    outputStream.write(csvData.toByteArray())
+                }
+                scope.launch {
+                    snackbarHostState.showSnackbar("Contacts exported successfully!")
+                }
+            } catch (e: Exception) {
+                scope.launch {
+                    snackbarHostState.showSnackbar("Error exporting: ${e.message}")
+                }
+            }
+        }
+    }
 
     val filteredContacts = contacts.filter { 
         it.name.contains(searchQuery, ignoreCase = true) || it.phoneNumber.contains(searchQuery)
     }
 
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        OutlinedTextField(
-            value = searchQuery,
-            onValueChange = { searchQuery = it },
-            label = { Text("Search contacts...") },
-            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp)
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-
-        if (filteredContacts.isEmpty()) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("No contacts found.", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) }
+    ) { padding ->
+        Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
+            
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    label = { Text("Search contacts...") },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(12.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                // Export Button
+                IconButton(
+                    onClick = { 
+                        if (contacts.isNotEmpty()) {
+                            createDocumentLauncher.launch("WhatsApp_Leads_${System.currentTimeMillis()}.csv") 
+                        } else {
+                            scope.launch { snackbarHostState.showSnackbar("No contacts to export.") }
+                        }
+                    },
+                    modifier = Modifier.background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), RoundedCornerShape(12.dp)).size(56.dp)
+                ) {
+                    Icon(Icons.Default.Download, contentDescription = "Export CSV", tint = MaterialTheme.colorScheme.primary)
+                }
             }
-        } else {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(filteredContacts) { contact ->
-                    ContactCard(
-                        contact = contact, 
-                        onPauseClick = { showPauseMenuForContact = contact },
-                        onIgnoreClick = { showIgnoreConfirmForContact = contact }
-                    )
+            
+            Spacer(modifier = Modifier.height(16.dp))
+
+            if (filteredContacts.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("No contacts found.", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
+                }
+            } else {
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(filteredContacts) { contact ->
+                        ContactCard(
+                            contact = contact, 
+                            onPauseClick = { showPauseMenuForContact = contact },
+                            onIgnoreClick = { showIgnoreConfirmForContact = contact }
+                        )
+                    }
                 }
             }
         }
@@ -106,34 +155,12 @@ fun ContactsScreen(viewModel: AppViewModel) {
             text = { Text("Choose how long the bot should stay silent for this contact.") },
             confirmButton = {
                 Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(
-                        onClick = { 
-                            viewModel.pauseContact(showPauseMenuForContact!!.name, 30)
-                            showPauseMenuForContact = null 
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) { Text("30 Minutes") }
-                    
-                    Button(
-                        onClick = { 
-                            viewModel.pauseContact(showPauseMenuForContact!!.name, 60)
-                            showPauseMenuForContact = null 
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) { Text("1 Hour") }
-                    
-                    Button(
-                        onClick = { 
-                            viewModel.pauseContact(showPauseMenuForContact!!.name, 120)
-                            showPauseMenuForContact = null 
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) { Text("2 Hours") }
+                    Button(onClick = { viewModel.pauseContact(showPauseMenuForContact!!.name, 30); showPauseMenuForContact = null }, modifier = Modifier.fillMaxWidth()) { Text("30 Minutes") }
+                    Button(onClick = { viewModel.pauseContact(showPauseMenuForContact!!.name, 60); showPauseMenuForContact = null }, modifier = Modifier.fillMaxWidth()) { Text("1 Hour") }
+                    Button(onClick = { viewModel.pauseContact(showPauseMenuForContact!!.name, 120); showPauseMenuForContact = null }, modifier = Modifier.fillMaxWidth()) { Text("2 Hours") }
                 }
             },
-            dismissButton = {
-                TextButton(onClick = { showPauseMenuForContact = null }) { Text("Cancel") }
-            }
+            dismissButton = { TextButton(onClick = { showPauseMenuForContact = null }) { Text("Cancel") } }
         )
     }
 
@@ -143,26 +170,14 @@ fun ContactsScreen(viewModel: AppViewModel) {
         AlertDialog(
             onDismissRequest = { showIgnoreConfirmForContact = null },
             title = { Text(if (isCurrentlyIgnored) "Unignore Contact?" else "Ignore Contact?") },
-            text = { 
-                Text(
-                    if (isCurrentlyIgnored) "The bot will start replying to ${showIgnoreConfirmForContact?.name} again."
-                    else "The bot will NEVER reply to ${showIgnoreConfirmForContact?.name} again, even if they trigger a rule."
-                ) 
-            },
+            text = { Text(if (isCurrentlyIgnored) "The bot will start replying to ${showIgnoreConfirmForContact?.name} again." else "The bot will NEVER reply to ${showIgnoreConfirmForContact?.name} again.") },
             confirmButton = {
                 Button(
-                    onClick = {
-                        viewModel.toggleIgnoreContact(showIgnoreConfirmForContact!!.name, !isCurrentlyIgnored)
-                        showIgnoreConfirmForContact = null
-                    },
+                    onClick = { viewModel.toggleIgnoreContact(showIgnoreConfirmForContact!!.name, !isCurrentlyIgnored); showIgnoreConfirmForContact = null },
                     colors = ButtonDefaults.buttonColors(containerColor = if (isCurrentlyIgnored) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
-                ) {
-                    Text(if (isCurrentlyIgnored) "Unignore" else "Ignore")
-                }
+                ) { Text(if (isCurrentlyIgnored) "Unignore" else "Ignore") }
             },
-            dismissButton = {
-                TextButton(onClick = { showIgnoreConfirmForContact = null }) { Text("Cancel") }
-            }
+            dismissButton = { TextButton(onClick = { showIgnoreConfirmForContact = null }) { Text("Cancel") } }
         )
     }
 }
@@ -193,16 +208,10 @@ fun ContactCard(contact: Contact, onPauseClick: () -> Unit, onIgnoreClick: () ->
                     Text(contact.name, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.onSurface)
                     Text(contact.phoneNumber, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
                     
-                    // Status Badges
                     Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.padding(top = 4.dp)) {
                         if (contact.tags.isNotBlank()) {
                             Surface(shape = RoundedCornerShape(4.dp), color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.2f)) {
-                                Text(
-                                    text = contact.tags, 
-                                    fontSize = 10.sp, 
-                                    color = MaterialTheme.colorScheme.tertiary, 
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                )
+                                Text(contact.tags, fontSize = 10.sp, color = MaterialTheme.colorScheme.tertiary, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
                             }
                         }
                         if (contact.isIgnored) {
@@ -218,7 +227,6 @@ fun ContactCard(contact: Contact, onPauseClick: () -> Unit, onIgnoreClick: () ->
                 }
             }
             
-            // Action Buttons
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                 TextButton(onClick = onPauseClick) {
                     Icon(Icons.Default.PauseCircle, contentDescription = "Pause", modifier = Modifier.size(18.dp))
