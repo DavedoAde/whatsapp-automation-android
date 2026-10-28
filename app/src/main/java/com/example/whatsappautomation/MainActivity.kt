@@ -220,7 +220,6 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
                     TopAppBar(
                         title = { 
                             if (currentRoute == "simulator") {
-                                // WACOPILOT STYLE HEADER FOR SIMULATOR
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Surface(shape = CircleShape, color = Color(0xFF00A884), modifier = Modifier.size(36.dp)) {
                                         Box(contentAlignment = Alignment.Center) { Text("🤖", fontSize = 18.sp) }
@@ -236,7 +235,7 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
                             } else {
                                 Text(
                                     text = when (currentRoute) {
-                                        Screen.Dashboard.route -> "Dashboard"
+                                        Screen.Dashboard.route -> "WAcopilot"
                                         Screen.Rules.route -> "Rules"
                                         Screen.Contacts.route -> "Contacts"
                                         Screen.Logs.route -> "Reply History"
