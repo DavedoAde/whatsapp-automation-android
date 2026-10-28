@@ -3,6 +3,8 @@ package com.example.whatsappautomation
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.PowerManager
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -10,8 +12,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
@@ -400,13 +404,19 @@ fun LogCard(log: ActivityLog) {
     }
 }
 
-// --- SETTINGS ---
+// --- SETTINGS (Redesigned) ---
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
-    var enableOriginalWA by remember { mutableStateOf(PreferenceManager.isWaOriginalEnabled(context)) }
-    var enableWABusiness by remember { mutableStateOf(PreferenceManager.isWaBusinessEnabled(context)) }
+    
+    var showWaDialog by remember { mutableStateOf(false) }
+    var currentWaVersion by remember { mutableStateOf(PreferenceManager.getWaVersion(context)) }
+    var isMultiUser by remember { mutableStateOf(PreferenceManager.isMultiUserEnabled(context)) }
+    var isNotificationsEnabled by remember { mutableStateOf(PreferenceManager.isNotificationsEnabled(context)) }
+    
+    val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+    val isBatteryOptimized = !powerManager.isIgnoringBatteryOptimizations(context.packageName)
 
     Scaffold(
         topBar = {
@@ -421,29 +431,139 @@ fun SettingsScreen(onBack: () -> Unit) {
             )
         }
     ) { padding ->
-        Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(16.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text("Version of WA", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                     Spacer(modifier = Modifier.height(8.dp))
-                    SwitchRow("WhatsApp (Original)", enableOriginalWA) { 
-                        enableOriginalWA = it
-                        PreferenceManager.setWaOriginalEnabled(context, it)
+                    
+                    Row(
+                        modifier = Modifier.fillMaxWidth().clickable { showWaDialog = true },
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Choose WA version", fontSize = 16.sp)
+                        Text(
+                            text = if (currentWaVersion == "ANY") "Any" else if (currentWaVersion == "ORIGINAL") "WA (Original)" else "WA Business",
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                            fontSize = 14.sp
+                        )
                     }
-                    SwitchRow("WhatsApp Business", enableWABusiness) { 
-                        enableWABusiness = it
-                        PreferenceManager.setWaBusinessEnabled(context, it)
+                }
+            }
+
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("Multi-User support", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text("Reply to WA versions of other users on this device (Dual App).", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        Switch(
+                            checked = isMultiUser, 
+                            onCheckedChange = { 
+                                isMultiUser = it
+                                PreferenceManager.setMultiUserEnabled(context, it)
+                            }
+                        )
+                    }
+                }
+            }
+
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("Notifications", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text("Get notified when the app has replied to a chat.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        Switch(
+                            checked = isNotificationsEnabled, 
+                            onCheckedChange = { 
+                                isNotificationsEnabled = it
+                                PreferenceManager.setNotificationsEnabled(context, it)
+                            }
+                        )
+                    }
+                }
+            }
+
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("Battery Optimization", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text(
+                        text = if (isBatteryOptimized) "Your phone is restricting background apps." else "Unrestricted. The app will work reliably.", 
+                        fontSize = 12.sp, 
+                        color = if (isBatteryOptimized) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    if (isBatteryOptimized) {
+                        Button(
+                            onClick = {
+                                try {
+                                    val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+                                    intent.data = Uri.parse("package:${context.packageName}")
+                                    context.startActivity(intent)
+                                } catch (e: Exception) {
+                                    val fallbackIntent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                                    fallbackIntent.data = Uri.parse("package:${context.packageName}")
+                                    context.startActivity(fallbackIntent)
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                        ) {
+                            Text("Disable Optimization")
+                        }
                     }
                 }
             }
         }
     }
+
+    if (showWaDialog) {
+        AlertDialog(
+            onDismissRequest = { showWaDialog = false },
+            title = { Text("Choose WA version") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    WaVersionOption("Any", "ANY", currentWaVersion) { 
+                        currentWaVersion = it; PreferenceManager.setWaVersion(context, it); showWaDialog = false 
+                    }
+                    WaVersionOption("WA (Original)", "ORIGINAL", currentWaVersion) { 
+                        currentWaVersion = it; PreferenceManager.setWaVersion(context, it); showWaDialog = false 
+                    }
+                    WaVersionOption("WA Business", "BUSINESS", currentWaVersion) { 
+                        currentWaVersion = it; PreferenceManager.setWaVersion(context, it); showWaDialog = false 
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showWaDialog = false }) {
+                    Text("CANCEL", color = MaterialTheme.colorScheme.primary)
+                }
+            }
+        )
+    }
 }
 
 @Composable
-fun SwitchRow(title: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(title, fontSize = 14.sp)
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
+fun WaVersionOption(title: String, value: String, currentValue: String, onSelect: (String) -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth().clickable { onSelect(value) }.padding(vertical = 8.dp)
+    ) {
+        RadioButton(
+            selected = currentValue == value,
+            onClick = { onSelect(value) }
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(title, fontSize = 16.sp)
     }
 }
