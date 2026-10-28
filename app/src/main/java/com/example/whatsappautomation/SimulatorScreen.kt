@@ -16,11 +16,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
-data class ChatMessage(val text: String, val isUser: Boolean)
+// Added timestamp to the data class
+data class ChatMessage(
+    val text: String, 
+    val isUser: Boolean, 
+    val timestamp: Long = System.currentTimeMillis()
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -66,8 +75,13 @@ fun SimulatorScreen(viewModel: AppViewModel, onBack: () -> Unit) {
 
     Scaffold(
         bottomBar = {
+            // Removed the card-like background from the input row
             Row(
-                modifier = Modifier.fillMaxWidth().background(Color(0xFF1F2C34)).padding(8.dp).imePadding(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFF0B141A)) // Matches the main background
+                    .padding(8.dp)
+                    .imePadding(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 OutlinedTextField(
@@ -77,8 +91,8 @@ fun SimulatorScreen(viewModel: AppViewModel, onBack: () -> Unit) {
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(24.dp),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = Color(0xFF2A3942),
-                        unfocusedContainerColor = Color(0xFF2A3942),
+                        focusedContainerColor = Color(0xFF1F2C34),
+                        unfocusedContainerColor = Color(0xFF1F2C34),
                         focusedBorderColor = Color.Transparent,
                         unfocusedBorderColor = Color.Transparent
                     ),
@@ -113,19 +127,40 @@ fun SimulatorScreen(viewModel: AppViewModel, onBack: () -> Unit) {
             }
         }
     ) { padding ->
-        // NO SECONDARY HEADER. Just the chat list directly on the background.
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .background(Color(0xFF0B141A)) // WhatsApp Dark Mode Background
+                .background(Color(0xFF0B141A))
         ) {
             LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding = PaddingValues(vertical = 16.dp)
+                contentPadding = PaddingValues(top = 16.dp, bottom = 8.dp) // Adjusted top padding
             ) {
+                // --- TODAY PILL ---
+                item {
+                    Box(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = Color(0xFF1F2C34)
+                        ) {
+                            Text(
+                                text = "Today",
+                                color = Color(0xFF8696A0),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+                }
+                // -----------------
+
                 items(messages) { message ->
                     ChatBubble(message)
                 }
@@ -145,10 +180,38 @@ fun ChatBubble(message: ChatMessage) {
     val bubbleColor = if (message.isUser) Color(0xFF005C4B) else Color(0xFF202C33)
     val alignment = if (message.isUser) Alignment.End else Alignment.Start
     val shape = if (message.isUser) RoundedCornerShape(16.dp, 16.dp, 0.dp, 16.dp) else RoundedCornerShape(16.dp, 16.dp, 16.dp, 0.dp)
+    
+    // Time formatter
+    val timeFormatter = SimpleDateFormat("h:mm a", Locale.getDefault())
+    val timeString = timeFormatter.format(Date(message.timestamp))
 
     Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = alignment) {
-        Box(modifier = Modifier.background(bubbleColor, shape).padding(12.dp).widthIn(max = 300.dp)) {
-            Text(text = message.text, color = Color(0xFFE9EDEF), fontSize = 15.sp)
+        Box(
+            modifier = Modifier
+                .background(bubbleColor, shape)
+                .padding(start = 12.dp, top = 8.dp, end = 12.dp, bottom = 8.dp)
+                .widthIn(max = 300.dp)
+        ) {
+            // Row to align text and timestamp at the bottom
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Bottom
+            ) {
+                Text(
+                    text = message.text,
+                    color = Color(0xFFE9EDEF),
+                    fontSize = 15.sp,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = timeString,
+                    color = Color(0xFF8696A0),
+                    fontSize = 10.sp,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
         }
     }
 }
