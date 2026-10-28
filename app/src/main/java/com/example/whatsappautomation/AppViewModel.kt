@@ -31,6 +31,18 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val allLogs = logDao.getAllLogs()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    // Bridge for CSV Export from Top Bar
+    private val _triggerCsvExport = MutableStateFlow(false)
+    val triggerCsvExport: StateFlow<Boolean> = _triggerCsvExport
+
+    fun triggerCsvExport() {
+        _triggerCsvExport.value = true
+    }
+    
+    fun resetCsvExportTrigger() {
+        _triggerCsvExport.value = false
+    }
+
     fun clearLogs() {
         viewModelScope.launch { logDao.clearAllLogs() }
     }
@@ -39,7 +51,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         _isAutomationActive.value = isActive
         PreferenceManager.setAutomationActive(getApplication(), isActive)
         
-        // Start/Stop Foreground Service
         val intent = Intent(getApplication(), ForegroundService::class.java)
         if (isActive) {
             ContextCompat.startForegroundService(getApplication(), intent)
@@ -86,7 +97,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     private var currentSenderId = "+1234567890" 
 
-    // Changed to suspend function to allow delays
     suspend fun simulateMessage(message: String): String {
         val allRulesList = allRules.value
         
@@ -108,11 +118,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                             tags = BotStateManager.activeRule?.assignTag ?: ""
                         )
                         contactDao.insertContact(newContact)
-                        
-                        val context = getApplication<Application>()
-                        if (ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_CONTACTS) == PackageManager.PERMISSION_GRANTED) {
-                            PhoneContactManager.saveContactToPhone(context, BotStateManager.tempName, currentSenderId)
-                        }
                     }
                     
                     val successMsg = BotStateManager.activeRule?.successMessage?.replace("{name}", BotStateManager.tempName) ?: "Saved!"
@@ -141,12 +146,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
         if (BotStateManager.currentMenuId != null) {
             val childRules = allRulesList.filter { it.parentRuleId == BotStateManager.currentMenuId && it.isActive }
-            // Bypass conditions for simulator
             val matchedChild = RuleEngine.findMatchingRule(getApplication(), message, childRules, checkConditions = false)
 
             if (matchedChild != null) {
-                
-                // APPLY DELAY
                 if (matchedChild.delayMax > 0) {
                     val min = matchedChild.delayMin
                     val max = matchedChild.delayMax
@@ -169,12 +171,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         val topLevelRules = allRulesList.filter { it.parentRuleId == null }
-        // Bypass conditions for simulator
         val matchedRule = RuleEngine.findMatchingRule(getApplication(), message, topLevelRules, checkConditions = false)
         
         return if (matchedRule != null) {
-            
-            // APPLY DELAY
             if (matchedRule.delayMax > 0) {
                 val min = matchedRule.delayMin
                 val max = matchedRule.delayMax
