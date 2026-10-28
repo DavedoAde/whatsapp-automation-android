@@ -69,6 +69,20 @@ class WhatsAppListenerService : NotificationListenerService() {
         if (System.currentTimeMillis() - lastReply < 3000) return
 
         scope.launch {
+            // --- NEW: CHECK IF CONTACT IS PAUSED OR IGNORED ---
+            val savedContact = database.contactDao().getContactByName(senderName)
+            if (savedContact != null) {
+                if (savedContact.isIgnored) {
+                    Log.d(TAG, "$senderName is ignored. Skipping.")
+                    return@launch
+                }
+                if (savedContact.pausedUntil > System.currentTimeMillis()) {
+                    Log.d(TAG, "$senderName is paused until ${savedContact.pausedUntil}. Skipping.")
+                    return@launch
+                }
+            }
+            // ---------------------------------------------------
+
             val result = processIncomingMessage(senderName, messageText)
             
             if (result != null && !result.replyText.isNullOrBlank()) {
@@ -96,7 +110,6 @@ class WhatsAppListenerService : NotificationListenerService() {
                             remoteInputAction.actionIntent.send(applicationContext, 0, intent)
                             BotStateManager.recordSentMessage(senderName, result.replyText)
                             
-                            // Log Success
                             database.logDao().insertLog(
                                 ActivityLog(
                                     senderName = senderName,
@@ -106,7 +119,6 @@ class WhatsAppListenerService : NotificationListenerService() {
                                 )
                             )
                         } catch (e: Exception) {
-                            // Log Error
                             database.logDao().insertLog(
                                 ActivityLog(
                                     senderName = senderName,
@@ -119,7 +131,6 @@ class WhatsAppListenerService : NotificationListenerService() {
                     }
                 }
             } else {
-                // Log No Match
                 database.logDao().insertLog(
                     ActivityLog(
                         senderName = senderName,
@@ -161,7 +172,6 @@ class WhatsAppListenerService : NotificationListenerService() {
                         )
                         contactDao.insertContact(newContact)
                         
-                        // Log Lead Saved
                         database.logDao().insertLog(
                             ActivityLog(
                                 senderName = sender,
