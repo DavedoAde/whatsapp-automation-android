@@ -1,12 +1,17 @@
 package com.example.whatsappautomation
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.app.Notification
 import android.app.RemoteInput
+import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Log
+import androidx.core.app.NotificationCompat
 import com.example.whatsappautomation.data.ActivityLog
 import com.example.whatsappautomation.data.AppDatabase
 import kotlinx.coroutines.CoroutineScope
@@ -21,10 +26,12 @@ class WhatsAppListenerService : NotificationListenerService() {
     private val scope = CoroutineScope(Dispatchers.IO)
     private lateinit var database: AppDatabase
     private val TAG = "WAListener"
+    private val REPLY_CHANNEL_ID = "reply_alerts_channel"
 
     override fun onCreate() {
         super.onCreate()
         database = AppDatabase.getDatabase(applicationContext)
+        createNotificationChannel()
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
@@ -41,7 +48,6 @@ class WhatsAppListenerService : NotificationListenerService() {
         } else if (packageName == "com.whatsapp.w4b") {
             if (waVersion == "ORIGINAL") return
         } else {
-            // If it's a cloned app and Multi-User is OFF, ignore it.
             if (!isMultiUser) return 
         }
         // ------------------------
@@ -77,14 +83,8 @@ class WhatsAppListenerService : NotificationListenerService() {
         scope.launch {
             val savedContact = database.contactDao().getContactByName(senderName)
             if (savedContact != null) {
-                if (savedContact.isIgnored) {
-                    Log.d(TAG, "$senderName is ignored. Skipping.")
-                    return@launch
-                }
-                if (savedContact.pausedUntil > System.currentTimeMillis()) {
-                    Log.d(TAG, "$senderName is paused. Skipping.")
-                    return@launch
-                }
+                if (savedContact.isIgnored) return@launch
+                if (savedContact.pausedUntil > System.currentTimeMillis()) return@launch
             }
 
             val result = processIncomingMessage(senderName, messageText)
@@ -114,6 +114,11 @@ class WhatsAppListenerService : NotificationListenerService() {
                             remoteInputAction.actionIntent.send(applicationContext, 0, intent)
                             BotStateManager.recordSentMessage(senderName, result.replyText)
                             
+                            // Check if the user wants notifications
+                            if (PreferenceManager.isNotificationsEnabled(applicationContext)) {
+                                showReplyNotification(senderName, result.replyText)
+                            }
+
                             database.logDao().insertLog(
                                 ActivityLog(
                                     senderName = senderName,
@@ -143,6 +148,37 @@ class WhatsAppListenerService : NotificationListenerService() {
                     )
                 )
             }
+        }
+    }
+
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                REPLY_CHANNEL_ID,
+                "Bot Reply Alerts",
+                NotificationManager.IMPORTANCE_LOW // LOW means it won't make a sound
+            )
+            val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            manager.createNotificationChannel(channel)
+        }
+    }
+
+    private fun showReplyNotification(senderName: String, replyText: String) {
+        val notification = NotificationCompat.Builder(this, REPLY_CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.stat_notify_chat)
+            .setContentTitle("Replied to $senderName")
+            .setContentText(replyText)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(replyText))
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setAutoCancel(true)
+            .build()
+
+        val notificationManager = androidx.core.app.NotificationManagerCompat.from(this)
+        try {
+            // Use a random ID so multiple notifications stack instead of overwriting
+            notificationManager.notify(System.currentTimeMillis().toInt(), notification)
+        } catch (e: SecurityException) {
+            Log.e(TAG, "Notification permission missing")
         }
     }
 
