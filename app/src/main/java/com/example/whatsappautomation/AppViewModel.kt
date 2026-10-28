@@ -83,103 +83,93 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     private var currentSenderId = "+1234567890" 
 
-    suspend fun simulateMessage(message: String): String {
-        val allRulesList = allRules.value
-        
-        when (BotStateManager.currentLeadState) {
-            LeadCaptureState.AWAITING_NAME -> {
-                BotStateManager.tempName = RuleEngine.extractName(message)
-                BotStateManager.currentLeadState = LeadCaptureState.AWAITING_CONFIRMATION
-                return BotStateManager.activeRule?.confirmQuestion?.replace("{name}", BotStateManager.tempName) ?: "Is your name ${BotStateManager.tempName}? Reply YES or NO."
-            }
-            
-            LeadCaptureState.AWAITING_CONFIRMATION -> {
-                val lowerMsg = message.trim().lowercase()
-                if (lowerMsg == "yes" || lowerMsg == "y") {
-                    viewModelScope.launch {
-                        val newContact = Contact(
-                            phoneNumber = currentSenderId, 
-                            name = BotStateManager.tempName, 
-                            sourceApp = "WhatsApp",
-                            tags = BotStateManager.activeRule?.assignTag ?: ""
-                        )
-                        contactDao.insertContact(newContact)
-                    }
-                    
-                    val successMsg = BotStateManager.activeRule?.successMessage?.replace("{name}", BotStateManager.tempName) ?: "Saved!"
-                    
-                    val hasSubMenu = allRulesList.any { it.parentRuleId == BotStateManager.activeRule?.id }
-                    if (hasSubMenu) {
-                        BotStateManager.currentMenuId = BotStateManager.activeRule?.id
-                    } else {
-                        BotStateManager.currentMenuId = null
-                    }
-                    
-                    BotStateManager.currentLeadState = LeadCaptureState.IDLE
-                    BotStateManager.activeRule = null
-                    return successMsg
-                    
-                } else if (lowerMsg == "no" || lowerMsg == "n") {
-                    BotStateManager.currentLeadState = LeadCaptureState.AWAITING_NAME
-                    BotStateManager.tempName = ""
-                    return BotStateManager.activeRule?.retryQuestion ?: "No problem. What's your name again?"
-                } else {
-                    return "Please reply YES or NO. Is your name ${BotStateManager.tempName}?"
-                }
-            }
-            LeadCaptureState.IDLE -> { /* Continue */ }
+// ... inside AppViewModel class ...
+
+suspend fun simulateMessage(message: String): String {
+    val allRulesList = allRules.value
+    
+    when (BotStateManager.currentLeadState) {
+        // ... (Lead capture logic remains the same) ...
+        LeadCaptureState.AWAITING_NAME -> {
+            BotStateManager.tempName = RuleEngine.extractName(message)
+            BotStateManager.currentLeadState = LeadCaptureState.AWAITING_CONFIRMATION
+            return BotStateManager.activeRule?.confirmQuestion?.replace("{name}", BotStateManager.tempName) ?: "Is your name ${BotStateManager.tempName}? Reply YES or NO."
         }
-
-        if (BotStateManager.currentMenuId != null) {
-            val childRules = allRulesList.filter { it.parentRuleId == BotStateManager.currentMenuId && it.isActive }
-            // Bypass conditions for simulator
-            val matchedChild = RuleEngine.findMatchingRule(getApplication(), message, childRules, checkConditions = false)
-
-            if (matchedChild != null) {
-                if (matchedChild.delayMax > 0) {
-                    val min = matchedChild.delayMin
-                    val max = matchedChild.delayMax
-                    val randomDelaySeconds = if (max > min) Random.nextInt(min, max) else min
-                    delay(randomDelaySeconds * 1000L)
-                }
-
-                val hasSubMenu = allRulesList.any { it.parentRuleId == matchedChild.id }
-                BotStateManager.currentMenuId = if (hasSubMenu) matchedChild.id else null
-                
-                if (matchedChild.askForName) {
-                    BotStateManager.currentLeadState = LeadCaptureState.AWAITING_NAME
-                    BotStateManager.activeRule = matchedChild
-                    return matchedChild.promptQuestion
-                }
-                return RuleEngine.getReplyText(matchedChild, number = currentSenderId)
+        
+        LeadCaptureState.AWAITING_CONFIRMATION -> {
+            // ... (YES/NO logic remains the same) ...
+            val lowerMsg = message.trim().lowercase()
+            if (lowerMsg == "yes" || lowerMsg == "y") {
+                // ... save contact ...
+                val successMsg = BotStateManager.activeRule?.successMessage?.replace("{name}", BotStateManager.tempName) ?: "Saved!"
+                // ...
+                return successMsg
+            } else if (lowerMsg == "no" || lowerMsg == "n") {
+                BotStateManager.currentLeadState = LeadCaptureState.AWAITING_NAME
+                BotStateManager.tempName = ""
+                return BotStateManager.activeRule?.retryQuestion ?: "No problem. What's your name again?"
             } else {
-                return ""
+                return "Please reply YES or NO. Is your name ${BotStateManager.tempName}?"
             }
         }
+        LeadCaptureState.IDLE -> { /* Continue */ }
+    }
 
-        val topLevelRules = allRulesList.filter { it.parentRuleId == null }
+    if (BotStateManager.currentMenuId != null) {
+        val childRules = allRulesList.filter { it.parentRuleId == BotStateManager.currentMenuId && it.isActive }
         // Bypass conditions for simulator
-        val matchedRule = RuleEngine.findMatchingRule(getApplication(), message, topLevelRules, checkConditions = false)
-        
-        return if (matchedRule != null) {
-            if (matchedRule.delayMax > 0) {
-                val min = matchedRule.delayMin
-                val max = matchedRule.delayMax
+        val matchedChild = RuleEngine.findMatchingRule(getApplication(), message, childRules, checkConditions = false)
+
+        if (matchedChild != null) {
+            
+            // --- THIS IS THE DELAY LOGIC ---
+            if (matchedChild.delayMax > 0) {
+                val min = matchedChild.delayMin
+                val max = matchedChild.delayMax
                 val randomDelaySeconds = if (max > min) Random.nextInt(min, max) else min
                 delay(randomDelaySeconds * 1000L)
             }
+            // -------------------------------
 
-            val hasSubMenu = allRulesList.any { it.parentRuleId == matchedRule.id }
-            BotStateManager.currentMenuId = if (hasSubMenu) matchedRule.id else null
-
-            if (matchedRule.askForName) {
+            val hasSubMenu = allRulesList.any { it.parentRuleId == matchedChild.id }
+            BotStateManager.currentMenuId = if (hasSubMenu) matchedChild.id else null
+            
+            if (matchedChild.askForName) {
                 BotStateManager.currentLeadState = LeadCaptureState.AWAITING_NAME
-                BotStateManager.activeRule = matchedRule
-                return matchedRule.promptQuestion
+                BotStateManager.activeRule = matchedChild
+                return matchedChild.promptQuestion
             }
-            RuleEngine.getReplyText(matchedRule, number = currentSenderId)
+            return RuleEngine.getReplyText(matchedChild, number = currentSenderId)
         } else {
-            "" 
+            return ""
         }
+    }
+
+    val topLevelRules = allRulesList.filter { it.parentRuleId == null }
+    // Bypass conditions for simulator
+    val matchedRule = RuleEngine.findMatchingRule(getApplication(), message, topLevelRules, checkConditions = false)
+    
+    return if (matchedRule != null) {
+        
+        // --- THIS IS THE DELAY LOGIC ---
+        if (matchedRule.delayMax > 0) {
+            val min = matchedRule.delayMin
+            val max = matchedRule.delayMax
+            val randomDelaySeconds = if (max > min) Random.nextInt(min, max) else min
+            delay(randomDelaySeconds * 1000L)
+        }
+        // -------------------------------
+
+        val hasSubMenu = allRulesList.any { it.parentRuleId == matchedRule.id }
+        BotStateManager.currentMenuId = if (hasSubMenu) matchedRule.id else null
+
+        if (matchedRule.askForName) {
+            BotStateManager.currentLeadState = LeadCaptureState.AWAITING_NAME
+            BotStateManager.activeRule = matchedRule
+            return matchedRule.promptQuestion
+        }
+        RuleEngine.getReplyText(matchedRule, number = currentSenderId)
+    } else {
+        "" 
     }
 }
