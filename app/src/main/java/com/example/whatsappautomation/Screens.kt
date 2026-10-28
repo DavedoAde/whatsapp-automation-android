@@ -61,6 +61,10 @@ fun StatCard(title: String, value: String, icon: androidx.compose.ui.graphics.ve
 fun ContactsScreen(viewModel: AppViewModel) {
     val contacts by viewModel.allContacts.collectAsState()
     var searchQuery by remember { mutableStateOf("") }
+    
+    // Dialog states
+    var showPauseMenuForContact by remember { mutableStateOf<Contact?>(null) }
+    var showIgnoreConfirmForContact by remember { mutableStateOf<Contact?>(null) }
 
     val filteredContacts = contacts.filter { 
         it.name.contains(searchQuery, ignoreCase = true) || it.phoneNumber.contains(searchQuery)
@@ -84,47 +88,147 @@ fun ContactsScreen(viewModel: AppViewModel) {
         } else {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(filteredContacts) { contact ->
-                    ContactCard(contact)
+                    ContactCard(
+                        contact = contact, 
+                        onPauseClick = { showPauseMenuForContact = contact },
+                        onIgnoreClick = { showIgnoreConfirmForContact = contact }
+                    )
                 }
             }
         }
     }
+
+    // Pause Duration Menu
+    if (showPauseMenuForContact != null) {
+        AlertDialog(
+            onDismissRequest = { showPauseMenuForContact = null },
+            title = { Text("Pause Bot for ${showPauseMenuForContact?.name}") },
+            text = { Text("Choose how long the bot should stay silent for this contact.") },
+            confirmButton = {
+                Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = { 
+                            viewModel.pauseContact(showPauseMenuForContact!!.name, 30)
+                            showPauseMenuForContact = null 
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("30 Minutes") }
+                    
+                    Button(
+                        onClick = { 
+                            viewModel.pauseContact(showPauseMenuForContact!!.name, 60)
+                            showPauseMenuForContact = null 
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("1 Hour") }
+                    
+                    Button(
+                        onClick = { 
+                            viewModel.pauseContact(showPauseMenuForContact!!.name, 120)
+                            showPauseMenuForContact = null 
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("2 Hours") }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPauseMenuForContact = null }) { Text("Cancel") }
+            }
+        )
+    }
+
+    // Ignore Confirmation
+    if (showIgnoreConfirmForContact != null) {
+        val isCurrentlyIgnored = showIgnoreConfirmForContact!!.isIgnored
+        AlertDialog(
+            onDismissRequest = { showIgnoreConfirmForContact = null },
+            title = { Text(if (isCurrentlyIgnored) "Unignore Contact?" else "Ignore Contact?") },
+            text = { 
+                Text(
+                    if (isCurrentlyIgnored) "The bot will start replying to ${showIgnoreConfirmForContact?.name} again."
+                    else "The bot will NEVER reply to ${showIgnoreConfirmForContact?.name} again, even if they trigger a rule."
+                ) 
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.toggleIgnoreContact(showIgnoreConfirmForContact!!.name, !isCurrentlyIgnored)
+                        showIgnoreConfirmForContact = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = if (isCurrentlyIgnored) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
+                ) {
+                    Text(if (isCurrentlyIgnored) "Unignore" else "Ignore")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showIgnoreConfirmForContact = null }) { Text("Cancel") }
+            }
+        )
+    }
 }
 
 @Composable
-fun ContactCard(contact: Contact) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier.size(48.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = if (contact.name.isNotBlank()) contact.name.first().uppercase() else "?",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-            Spacer(modifier = Modifier.width(16.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(contact.name, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.onSurface)
-                Text(contact.phoneNumber, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
-                
-                if (contact.tags.isNotBlank()) {
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        contact.tags.split(",").forEach { tag ->
+fun ContactCard(contact: Contact, onPauseClick: () -> Unit, onIgnoreClick: () -> Unit) {
+    val isPaused = contact.pausedUntil > System.currentTimeMillis()
+    
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = if (contact.isIgnored) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier.size(48.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = if (contact.name.isNotBlank()) contact.name.first().uppercase() else "?",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+                Spacer(modifier = Modifier.width(16.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(contact.name, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.onSurface)
+                    Text(contact.phoneNumber, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
+                    
+                    // Status Badges
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.padding(top = 4.dp)) {
+                        if (contact.tags.isNotBlank()) {
                             Surface(shape = RoundedCornerShape(4.dp), color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.2f)) {
                                 Text(
-                                    text = tag.trim(), 
+                                    text = contact.tags, 
                                     fontSize = 10.sp, 
                                     color = MaterialTheme.colorScheme.tertiary, 
                                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                 )
                             }
                         }
+                        if (contact.isIgnored) {
+                            Surface(shape = RoundedCornerShape(4.dp), color = MaterialTheme.colorScheme.error.copy(alpha = 0.2f)) {
+                                Text("Ignored", fontSize = 10.sp, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                            }
+                        } else if (isPaused) {
+                            Surface(shape = RoundedCornerShape(4.dp), color = Color(0xFFFF9800).copy(alpha = 0.2f)) {
+                                Text("Paused", fontSize = 10.sp, color = Color(0xFFFF9800), modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                            }
+                        }
                     }
+                }
+            }
+            
+            // Action Buttons
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = onPauseClick) {
+                    Icon(Icons.Default.PauseCircle, contentDescription = "Pause", modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Pause", fontSize = 12.sp)
+                }
+                TextButton(onClick = onIgnoreClick) {
+                    Icon(Icons.Default.Block, contentDescription = "Ignore", modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.error)
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(if (contact.isIgnored) "Unignore" else "Ignore", fontSize = 12.sp, color = MaterialTheme.colorScheme.error)
                 }
             }
         }
