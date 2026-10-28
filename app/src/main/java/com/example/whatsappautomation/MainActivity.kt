@@ -63,6 +63,7 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
         Screen.Dashboard, 
         Screen.Rules,
         Screen.Contacts, 
+        Screen.Logs, // Added Logs
         Screen.Settings
     )
     
@@ -73,6 +74,7 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
         Screen.Dashboard.route, 
         Screen.Contacts.route, 
         Screen.Rules.route,
+        Screen.Logs.route,
         Screen.Settings.route
     )
 
@@ -138,7 +140,6 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
                 TopAppBar(
                     title = { Text("WhatsApp Automation", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleLarge) },
                     actions = {
-                        // Chat Simulator Icon
                         IconButton(onClick = { navController.navigate("simulator") }) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.Chat, 
@@ -147,7 +148,6 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
                             )
                         }
                         
-                        // Master ON/OFF Switch
                         Switch(
                             checked = isAutomationActive,
                             onCheckedChange = { isChecked ->
@@ -230,6 +230,7 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
                 ) 
             }
             composable(Screen.Contacts.route) { ContactsScreen(viewModel) }
+            composable(Screen.Logs.route) { LogsScreen(viewModel) }
             composable(Screen.Settings.route) { SettingsScreen() }
             
             composable("simulator") { 
