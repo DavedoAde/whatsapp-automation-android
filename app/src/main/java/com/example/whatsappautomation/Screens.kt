@@ -3,9 +3,6 @@ package com.example.whatsappautomation
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.os.PowerManager
-import android.provider.Settings
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -14,7 +11,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -24,18 +20,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.whatsappautomation.data.ActivityLog
 import com.example.whatsappautomation.data.AutomationRule
 import com.example.whatsappautomation.data.Contact
-
-// --- BATTERY OPTIMIZATION SCREEN (Legacy, no longer used for blocking) ---
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun BatteryOptimizationScreen(onBack: () -> Unit, onRetry: () -> Unit) {
-    // ... (Keep the existing code for this screen, it's not used anymore since we use the dialog) ...
-}
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 // --- DASHBOARD ---
 @Composable
@@ -44,12 +36,10 @@ fun DashboardScreen(viewModel: AppViewModel) {
     val totalContactsCount by viewModel.totalContactsCount.collectAsState()
     
     Column(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             StatCard(title = "Active Rules", value = "$activeRulesCount", icon = Icons.Default.Rule, modifier = Modifier.weight(1f))
             StatCard(title = "Contacts", value = "$totalContactsCount", icon = Icons.Default.People, modifier = Modifier.weight(1f))
         }
-
         Spacer(modifier = Modifier.weight(1f))
     }
 }
@@ -241,12 +231,66 @@ fun RuleCard(rule: AutomationRule, onToggleClick: () -> Unit, onEditClick: () ->
     }
 }
 
-// --- SETTINGS (Updated) ---
+// --- LOGS ---
+@Composable
+fun LogsScreen(viewModel: AppViewModel) {
+    val logs by viewModel.allLogs.collectAsState()
+
+    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+        Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text("Activity Logs", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+            TextButton(onClick = { viewModel.clearLogs() }) {
+                Text("Clear Logs", color = MaterialTheme.colorScheme.error)
+            }
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+
+        if (logs.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("No activity yet.", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
+            }
+        } else {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(logs) { log ->
+                    LogCard(log)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun LogCard(log: ActivityLog) {
+    val formatter = SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault())
+    val dateString = formatter.format(Date(log.timestamp))
+    
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = if (log.isError) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surface)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                Text(log.actionTaken, fontWeight = FontWeight.Bold, color = if (log.isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)
+                Text(dateString, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            Text("From: ${log.senderName}", fontWeight = FontWeight.Medium, fontSize = 14.sp)
+            Text("Msg: \"${log.incomingMessage}\"", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f))
+            
+            if (log.replyText.isNotBlank()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Surface(shape = RoundedCornerShape(8.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
+                    Text("Reply: ${log.replyText}", fontSize = 13.sp, modifier = Modifier.padding(8.dp))
+                }
+            }
+        }
+    }
+}
+
+// --- SETTINGS ---
 @Composable
 fun SettingsScreen() {
     val context = LocalContext.current
-    
-    // Load saved preferences
     var enableOriginalWA by remember { mutableStateOf(PreferenceManager.isWaOriginalEnabled(context)) }
     var enableWABusiness by remember { mutableStateOf(PreferenceManager.isWaBusinessEnabled(context)) }
 
@@ -259,11 +303,11 @@ fun SettingsScreen() {
                 Spacer(modifier = Modifier.height(8.dp))
                 SwitchRow("WhatsApp (Original)", enableOriginalWA) { 
                     enableOriginalWA = it
-                    PreferenceManager.setWaOriginalEnabled(context, it) // Save instantly
+                    PreferenceManager.setWaOriginalEnabled(context, it)
                 }
                 SwitchRow("WhatsApp Business", enableWABusiness) { 
                     enableWABusiness = it
-                    PreferenceManager.setWaBusinessEnabled(context, it) // Save instantly
+                    PreferenceManager.setWaBusinessEnabled(context, it)
                 }
             }
         }
