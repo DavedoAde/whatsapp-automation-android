@@ -5,10 +5,11 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-@Database(entities = [Contact::class, AutomationRule::class], version = 8, exportSchema = false)
+@Database(entities = [Contact::class, AutomationRule::class, ActivityLog::class], version = 9, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun contactDao(): ContactDao
     abstract fun ruleDao(): RuleDao
+    abstract fun logDao(): LogDao // Added
 
     companion object {
         @Volatile
