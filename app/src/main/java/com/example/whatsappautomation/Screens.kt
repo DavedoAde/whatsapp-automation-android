@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.sp
 import com.example.whatsappautomation.data.ActivityLog
 import com.example.whatsappautomation.data.AutomationRule
 import com.example.whatsappautomation.data.Contact
+import kotlinx.coroutines.launch // <--- THIS WAS MISSING
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
