@@ -8,7 +8,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material3.*
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -31,7 +30,6 @@ fun SimulatorScreen(viewModel: AppViewModel, onBack: () -> Unit) {
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     
-    // State to show "Typing..." indicator
     var isBotTyping by remember { mutableStateOf(false) }
     
     val isAutomationActive by viewModel.isAutomationActive.collectAsState()
@@ -49,10 +47,9 @@ fun SimulatorScreen(viewModel: AppViewModel, onBack: () -> Unit) {
         }
     }
 
-    // Auto-scroll when messages change OR when bot starts typing
     LaunchedEffect(messages.size, isBotTyping) {
         if (messages.isNotEmpty()) {
-            listState.animateScrollToItem(messages.size) // Scroll to bottom including typing indicator
+            listState.animateScrollToItem(messages.size)
         }
     }
 
@@ -67,29 +64,8 @@ fun SimulatorScreen(viewModel: AppViewModel, onBack: () -> Unit) {
         )
     }
 
+    // Scaffold WITHOUT a topBar
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { 
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Surface(shape = CircleShape, color = Color(0xFF00A884), modifier = Modifier.size(36.dp)) {
-                            Box(contentAlignment = Alignment.Center) { Text("🤖", fontSize = 20.sp) }
-                        }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column {
-                            Text("Chat Simulator", fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                            Text(if (isBotTyping) "typing..." else "Online", fontSize = 12.sp, color = Color(0xFF00A884))
-                        }
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF1F2C34))
-            )
-        },
         bottomBar = {
             Row(
                 modifier = Modifier.fillMaxWidth().background(Color(0xFF1F2C34)).padding(8.dp).imePadding(),
@@ -117,14 +93,10 @@ fun SimulatorScreen(viewModel: AppViewModel, onBack: () -> Unit) {
                             messages.add(ChatMessage(userText, true))
                             inputMessage = ""
                             
-                            // Show typing indicator
                             isBotTyping = true
 
                             scope.launch {
-                                // The ViewModel will pause here based on the min/max delay
                                 val botReplyText = viewModel.simulateMessage(userText)
-                                
-                                // Hide typing indicator
                                 isBotTyping = false
                                 
                                 if (botReplyText.isNotBlank()) {
@@ -142,7 +114,22 @@ fun SimulatorScreen(viewModel: AppViewModel, onBack: () -> Unit) {
             }
         }
     ) { padding ->
-        Box(modifier = Modifier.fillMaxSize().padding(padding).background(Color(0xFF0B141A))) {
+        Column(modifier = Modifier.fillMaxSize().padding(padding).background(Color(0xFF0B141A))) {
+            // Chat Header (Mini profile bar inside the chat)
+            Row(
+                modifier = Modifier.fillMaxWidth().background(Color(0xFF1F2C34)).padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(shape = CircleShape, color = Color(0xFF00A884), modifier = Modifier.size(40.dp)) {
+                    Box(contentAlignment = Alignment.Center) { Text("🤖", fontSize = 20.sp) }
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text("AutoResponder", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFFE9EDEF))
+                    Text(if (isBotTyping) "typing..." else "Online", fontSize = 12.sp, color = Color(0xFF00A884))
+                }
+            }
+
             LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp),
@@ -153,7 +140,6 @@ fun SimulatorScreen(viewModel: AppViewModel, onBack: () -> Unit) {
                     ChatBubble(message)
                 }
                 
-                // Show Typing Bubble if bot is thinking
                 if (isBotTyping) {
                     item {
                         TypingBubble()
