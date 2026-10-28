@@ -16,7 +16,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Chat
@@ -28,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.NotificationManagerCompat
@@ -181,7 +184,7 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
                 drawerShape = MaterialTheme.shapes.large
             ) {
                 Column(modifier = Modifier.padding(24.dp)) {
-                    Text("WhatsApp Automation", fontSize = 20.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text("WAcopilot", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                     Text("Version 1.0", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
                 }
                 Divider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f), modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
@@ -211,27 +214,41 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
     ) {
         Scaffold(
             snackbarHost = { SnackbarHost(snackbarHostState) },
-            // FIXED: Tells Scaffold not to add system bar padding to the content
             contentWindowInsets = WindowInsets(0, 0, 0, 0),
             topBar = {
                 if (currentRoute != "welcome") {
                     TopAppBar(
                         title = { 
-                            Text(
-                                text = when (currentRoute) {
-                                    Screen.Dashboard.route -> "Dashboard"
-                                    Screen.Rules.route -> "Rules"
-                                    Screen.Contacts.route -> "Contacts"
-                                    Screen.Logs.route -> "Reply History"
-                                    Screen.Settings.route -> "Settings"
-                                    "simulator" -> "Simulator"
-                                    else -> if (navBackStackEntry?.arguments?.getLong("ruleId") == 0L) "Create Rule" else "Edit Rule"
-                                },
-                                modifier = Modifier.padding(start = 12.dp),
-                                color = MaterialTheme.colorScheme.primary, 
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
-                            ) 
+                            if (currentRoute == "simulator") {
+                                // WACOPILOT STYLE HEADER FOR SIMULATOR
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Surface(shape = CircleShape, color = Color(0xFF00A884), modifier = Modifier.size(36.dp)) {
+                                        Box(contentAlignment = Alignment.Center) { Text("🤖", fontSize = 18.sp) }
+                                    }
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Text(
+                                        text = "WAcopilot",
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            } else {
+                                Text(
+                                    text = when (currentRoute) {
+                                        Screen.Dashboard.route -> "Dashboard"
+                                        Screen.Rules.route -> "Rules"
+                                        Screen.Contacts.route -> "Contacts"
+                                        Screen.Logs.route -> "Reply History"
+                                        Screen.Settings.route -> "Settings"
+                                        else -> if (navBackStackEntry?.arguments?.getLong("ruleId") == 0L) "Create Rule" else "Edit Rule"
+                                    },
+                                    modifier = Modifier.padding(start = 12.dp),
+                                    color = MaterialTheme.colorScheme.primary, 
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         },
                         navigationIcon = {
                             if (isMainScreen) {
@@ -278,7 +295,6 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
                                 }
                             }
 
-                            // Universal 3-Dot Menu
                             IconButton(onClick = { showGlobalMenu = true }) {
                                 Icon(Icons.Default.MoreVert, contentDescription = "More", tint = MaterialTheme.colorScheme.primary)
                             }
@@ -288,7 +304,7 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
                             ) {
                                 if (currentRoute == Screen.Rules.route) {
                                     DropdownMenuItem(text = { Text("Import Rules (JSON)") }, onClick = { showGlobalMenu = false; importRulesLauncher.launch(arrayOf("application/json")) })
-                                    DropdownMenuItem(text = { Text("Export All Rules (JSON)") }, onClick = { showGlobalMenu = false; exportRulesLauncher.launch("WhatsApp_Rules_${System.currentTimeMillis()}.json") })
+                                    DropdownMenuItem(text = { Text("Export All Rules (JSON)") }, onClick = { showGlobalMenu = false; exportRulesLauncher.launch("WAcopilot_Rules_${System.currentTimeMillis()}.json") })
                                 } else if (currentRoute == Screen.Contacts.route) {
                                     DropdownMenuItem(text = { Text("Export Contacts (CSV)") }, onClick = { showGlobalMenu = false; viewModel.triggerCsvExport() })
                                 } else if (currentRoute == Screen.Logs.route) {
@@ -299,8 +315,6 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
                                     DropdownMenuItem(text = { Text("Clear Chat (UI Only)") }, onClick = { showGlobalMenu = false })
                                 } else if (currentRoute == Screen.Dashboard.route) {
                                     DropdownMenuItem(text = { Text("Global Settings") }, onClick = { showGlobalMenu = false; navController.navigate(Screen.Settings.route) })
-                                } else if (isRuleEditor) {
-                                    DropdownMenuItem(text = { Text("Rule Settings") }, onClick = { showGlobalMenu = false })
                                 }
                             }
                         },
@@ -381,7 +395,7 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
             title = { Text("Permissions Required") },
             text = { 
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("To turn on the AutoResponder, you must grant the following permissions:")
+                    Text("To turn on WAcopilot, you must grant the following permissions:")
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                         Icon(imageVector = if (hasNotifAccess) Icons.Default.CheckCircle else Icons.Default.Warning, contentDescription = null, tint = if (hasNotifAccess) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
                         Spacer(modifier = Modifier.width(8.dp))
