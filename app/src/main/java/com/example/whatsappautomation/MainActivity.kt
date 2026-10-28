@@ -15,6 +15,8 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
@@ -74,7 +76,6 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
     
-    // FIXED: Only show top/bottom bars on main screens
     val isMainScreen = currentRoute in listOf(
         Screen.Dashboard.route, 
         Screen.Contacts.route, 
@@ -138,7 +139,7 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
         drawerState = drawerState,
         drawerContent = {
             ModalDrawerSheet(
-                modifier = Modifier.fillMaxWidth(0.66f), // FIXED: 2/3 of the screen
+                modifier = Modifier.fillMaxWidth(0.66f),
                 drawerContainerColor = MaterialTheme.colorScheme.surface,
                 drawerShape = MaterialTheme.shapes.large
             ) {
@@ -248,19 +249,24 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
                 composable(Screen.Rules.route) { RulesScreen(viewModel, onEditRule = { ruleId -> navController.navigate("rule_editor/$ruleId/0") }) }
                 composable(Screen.Contacts.route) { ContactsScreen(viewModel) }
                 
-                // FIXED: Added slide transitions for Logs and Settings
+                // FIXED: Added pop transitions for Logs
                 composable(
                     route = Screen.Logs.route,
-                    enterTransition = { slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(300)) },
-                    exitTransition = { slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(300)) }
+                    enterTransition = { slideInHorizontally(initialOffsetX = { -it }, animationSpec = tween(300)) },
+                    exitTransition = { slideOutHorizontally(targetOffsetX = { -it }, animationSpec = tween(300)) },
+                    popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }, animationSpec = tween(300)) },
+                    popExitTransition = { slideOutHorizontally(targetOffsetX = { it }, animationSpec = tween(300)) }
                 ) { 
                     LogsScreen(viewModel, onBack = { navController.popBackStack() }) 
                 }
                 
+                // FIXED: Added pop transitions for Settings
                 composable(
                     route = Screen.Settings.route,
-                    enterTransition = { slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(300)) },
-                    exitTransition = { slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(300)) }
+                    enterTransition = { slideInHorizontally(initialOffsetX = { -it }, animationSpec = tween(300)) },
+                    exitTransition = { slideOutHorizontally(targetOffsetX = { -it }, animationSpec = tween(300)) },
+                    popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }, animationSpec = tween(300)) },
+                    popExitTransition = { slideOutHorizontally(targetOffsetX = { it }, animationSpec = tween(300)) }
                 ) { 
                     SettingsScreen(onBack = { navController.popBackStack() }) 
                 }
