@@ -13,7 +13,6 @@ data class Contact(
     val isConfirmed: Boolean = true,
     val leadStatus: String = "New",
     val tags: String = "",
-    // NEW: Pause and Ignore fields
     val pausedUntil: Long = 0L,
     val isIgnored: Boolean = false
 )
@@ -37,9 +36,16 @@ data class AutomationRule(
     val retryQuestion: String = "No problem. What's your name again?",
     val successMessage: String = "Thank you {name}! Your details have been saved.",
     val assignTag: String = "", 
+    
+    // Hardware Conditions
     val requireScreenOff: Boolean = false,
     val requireCharging: Boolean = false,
     val requireDnd: Boolean = false,
+    
+    // NEW: Time Conditions
+    val startTime: String = "",
+    val endTime: String = "",
+    
     val parentRuleId: Long? = null 
 )
 
