@@ -138,7 +138,6 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
 
     var showGlobalMenu by remember { mutableStateOf(false) }
 
-    // --- FILE PICKERS FOR IMPORT/EXPORT ---
     val exportRulesLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/json")
     ) { uri: Uri? ->
@@ -170,13 +169,11 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
             }
         }
     }
-    // ----------------------------------------
 
-    Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) }
-    ) { scaffoldPadding ->
+    Scaffold(snackbarHost = { SnackbarHost(snackbarHostState) }) { scaffoldPadding ->
         ModalNavigationDrawer(
             drawerState = drawerState,
+            modifier = Modifier.padding(scaffoldPadding),
             drawerContent = {
                 ModalDrawerSheet(
                     modifier = Modifier.fillMaxWidth(0.66f),
@@ -213,7 +210,6 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
             }
         ) {
             Scaffold(
-                modifier = Modifier.padding(scaffoldPadding),
                 topBar = {
                     if (currentRoute != "welcome") {
                         TopAppBar(
