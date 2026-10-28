@@ -2,6 +2,7 @@ package com.example.whatsappautomation
 
 import android.Manifest
 import android.app.Application
+import android.content.Intent
 import android.content.pm.PackageManager
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
@@ -22,13 +23,30 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val database = AppDatabase.getDatabase(application)
     private val contactDao = database.contactDao()
     private val ruleDao = database.ruleDao()
+    private val logDao = database.logDao()
 
     private val _isAutomationActive = MutableStateFlow(PreferenceManager.isAutomationActive(application))
     val isAutomationActive: StateFlow<Boolean> = _isAutomationActive
 
+    // --- LOGS FLOW ---
+    val allLogs = logDao.getAllLogs()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun clearLogs() {
+        viewModelScope.launch { logDao.clearAllLogs() }
+    }
+
     fun toggleAutomation(isActive: Boolean) {
         _isAutomationActive.value = isActive
         PreferenceManager.setAutomationActive(getApplication(), isActive)
+        
+        // Start/Stop Foreground Service
+        val intent = Intent(getApplication(), ForegroundService::class.java)
+        if (isActive) {
+            ContextCompat.startForegroundService(getApplication(), intent)
+        } else {
+            getApplication<Application>().stopService(intent)
+        }
     }
 
     val activeRulesCount = ruleDao.getActiveRuleCount()
@@ -54,7 +72,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     private var currentSenderId = "+1234567890" 
 
-    // Changed to suspend function
     suspend fun simulateMessage(message: String): String {
         val allRulesList = allRules.value
         
@@ -112,7 +129,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             val matchedChild = RuleEngine.findMatchingRule(message, childRules)
 
             if (matchedChild != null) {
-                // APPLY DELAY
                 if (matchedChild.delayMax > 0) {
                     val min = matchedChild.delayMin
                     val max = matchedChild.delayMax
@@ -138,7 +154,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val matchedRule = RuleEngine.findMatchingRule(message, topLevelRules)
         
         return if (matchedRule != null) {
-            // APPLY DELAY
             if (matchedRule.delayMax > 0) {
                 val min = matchedRule.delayMin
                 val max = matchedRule.delayMax
