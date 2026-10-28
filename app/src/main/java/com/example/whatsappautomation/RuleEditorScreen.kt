@@ -55,6 +55,10 @@ fun RuleEditorScreen(
     var successMessage by rememberSaveable(existingRule?.id) { mutableStateOf(existingRule?.successMessage ?: "Thank you {name}! Your details have been saved.") }
     var assignTag by rememberSaveable(existingRule?.id) { mutableStateOf(existingRule?.assignTag ?: "") }
     
+    // NEW STATE
+    var label by rememberSaveable(existingRule?.id) { mutableStateOf(existingRule?.label ?: "") }
+    var targetVersion by rememberSaveable(existingRule?.id) { mutableStateOf(existingRule?.targetVersion ?: "ANY") }
+    
     var screenOff by rememberSaveable(existingRule?.id) { mutableStateOf(existingRule?.requireScreenOff ?: false) }
     var charging by rememberSaveable(existingRule?.id) { mutableStateOf(existingRule?.requireCharging ?: false) }
     var dnd by rememberSaveable(existingRule?.id) { mutableStateOf(existingRule?.requireDnd ?: false) }
@@ -62,8 +66,13 @@ fun RuleEditorScreen(
     var endTime by rememberSaveable(existingRule?.id) { mutableStateOf(existingRule?.endTime ?: "") }
 
     var expandedCard by rememberSaveable { mutableStateOf("TRIGGER") }
+    
+    // MENU STATES
+    var showMenu by remember { mutableStateOf(false) }
+    var showLabelDialog by remember { mutableStateOf(false) }
+    var showVersionsDialog by remember { mutableStateOf(false) }
+    var tempLabel by remember { mutableStateOf(label) }
 
-    // Logic: If editing, show everything. If new, wait for trigger to be typed OR Welcome message selected.
     val showOtherCards = existingRule != null || trigger.isNotBlank() || matchType == "WELCOME"
 
     val replies = remember { mutableStateListOf<String>() }
@@ -90,11 +99,44 @@ fun RuleEditorScreen(
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
+            // COMPACT TOP BAR
             TopAppBar(
-                title = { Text(if (existingRule == null) "Create Rule" else "Edit Rule", fontWeight = FontWeight.Bold) },
+                title = { 
+                    Column {
+                        Text(if (existingRule == null) "Create Rule" else "Rule", fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                        if (label.isNotBlank()) {
+                            Text(label, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f))
+                        }
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { showMenu = true }) {
+                        Icon(Icons.Default.MoreVert, contentDescription = "Menu")
+                    }
+                    DropdownMenu(
+                        expanded = showMenu,
+                        onDismissRequest = { showMenu = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text(if (label.isBlank()) "Add label" else "Edit label") },
+                            onClick = { 
+                                showMenu = false
+                                tempLabel = label
+                                showLabelDialog = true 
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Specific versions") },
+                            onClick = { 
+                                showMenu = false
+                                showVersionsDialog = true 
+                            }
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
@@ -114,7 +156,7 @@ fun RuleEditorScreen(
                             askForName = askForName, promptQuestion = promptQuestion, confirmQuestion = confirmQuestion,
                             retryQuestion = retryQuestion, successMessage = successMessage, assignTag = assignTag,
                             requireScreenOff = screenOff, requireCharging = charging, requireDnd = dnd,
-                            startTime = startTime, endTime = endTime
+                            startTime = startTime, endTime = endTime, label = label, targetVersion = targetVersion
                         ) ?: AutomationRule(
                             name = finalName, triggerKeyword = trigger, replyMessage = combinedReplies,
                             matchType = matchType, targetChat = targetChat, replyMode = replyMode,
@@ -122,7 +164,7 @@ fun RuleEditorScreen(
                             askForName = askForName, promptQuestion = promptQuestion, confirmQuestion = confirmQuestion,
                             retryQuestion = retryQuestion, successMessage = successMessage, assignTag = assignTag,
                             requireScreenOff = screenOff, requireCharging = charging, requireDnd = dnd,
-                            startTime = startTime, endTime = endTime, parentRuleId = parentId
+                            startTime = startTime, endTime = endTime, parentRuleId = parentId, label = label, targetVersion = targetVersion
                         )
                         onSave(newRule)
                     } else {
@@ -130,7 +172,7 @@ fun RuleEditorScreen(
                     }
                 },
                 containerColor = if (canSave) MaterialTheme.colorScheme.primary else Color.Gray,
-                modifier = Modifier.imePadding() // FIX: Floats above keyboard
+                modifier = Modifier.imePadding()
             ) {
                 Icon(Icons.Default.Check, contentDescription = "Save Rule", tint = Color.White)
             }
@@ -140,7 +182,7 @@ fun RuleEditorScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .imePadding() // FIX: Pushes content up when keyboard opens
+                .imePadding()
                 .verticalScroll(scrollState)
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -159,7 +201,7 @@ fun RuleEditorScreen(
                         label = { Text("Trigger words") },
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(12.dp),
-                        readOnly = matchType == "WELCOME", // Lock if Welcome Message
+                        readOnly = matchType == "WELCOME",
                         colors = OutlinedTextFieldDefaults.colors(
                             disabledTextColor = MaterialTheme.colorScheme.onSurface,
                             disabledBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f),
@@ -168,7 +210,6 @@ fun RuleEditorScreen(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     
-                    // Hide the ALL (*) button if Welcome Message is selected
                     if (matchType != "WELCOME") {
                         Button(
                             onClick = { trigger = "*"; matchType = "EXACT" }, 
@@ -202,7 +243,6 @@ fun RuleEditorScreen(
                 
                 Spacer(modifier = Modifier.height(12.dp))
                 
-                // CLEAN MATCH ROWS
                 MatchOptionRow("Exact match", "EXACT", matchType) { 
                     matchType = it 
                     if (it != "WELCOME" && trigger == "%Welcome_message%") trigger = ""
@@ -221,12 +261,11 @@ fun RuleEditorScreen(
                 }
                 MatchOptionRow("Welcome message", "WELCOME", matchType) { 
                     matchType = it 
-                    if (it == "WELCOME") trigger = "%Welcome_message%" // Auto-fill
-                    else if (trigger == "%Welcome_message%") trigger = "" // Clear if moving away
+                    if (it == "WELCOME") trigger = "%Welcome_message%"
+                    else if (trigger == "%Welcome_message%") trigger = ""
                 }
             }
 
-            // DYNAMIC APPEARANCE
             AnimatedVisibility(
                 visible = showOtherCards,
                 enter = fadeIn(tween(500)) + expandVertically(tween(500)),
@@ -423,9 +462,63 @@ fun RuleEditorScreen(
         }
     }
 
+    // --- DIALOGS ---
+    if (showLabelDialog) {
+        AlertDialog(
+            onDismissRequest = { showLabelDialog = false },
+            title = { Text("Add Label") },
+            text = {
+                OutlinedTextField(
+                    value = tempLabel,
+                    onValueChange = { tempLabel = it },
+                    label = { Text("Label name (e.g. Sales, Support)") },
+                    singleLine = true
+                )
+            },
+            confirmButton = {
+                Button(onClick = { 
+                    label = tempLabel
+                    showLabelDialog = false 
+                }) { Text("Save") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLabelDialog = false }) { Text("Cancel") }
+            }
+        )
+    }
+
+    if (showVersionsDialog) {
+        AlertDialog(
+            onDismissRequest = { showVersionsDialog = false },
+            title = { Text("Specific versions") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { targetVersion = "ANY" }) {
+                        RadioButton(selected = targetVersion == "ANY", onClick = { targetVersion = "ANY" })
+                        Text("Any (Default)")
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { targetVersion = "ORIGINAL" }) {
+                        RadioButton(selected = targetVersion == "ORIGINAL", onClick = { targetVersion = "ORIGINAL" })
+                        Text("WhatsApp (Original)")
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { targetVersion = "BUSINESS" }) {
+                        RadioButton(selected = targetVersion == "BUSINESS", onClick = { targetVersion = "BUSINESS" })
+                        Text("WhatsApp Business")
+                    }
+                }
+            },
+            confirmButton = {
+                Button(onClick = { showVersionsDialog = false }) { Text("OK") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showVersionsDialog = false }) { Text("CANCEL") }
+            }
+        )
+    }
+
     LaunchedEffect(showValidationError) {
         if (showValidationError) {
-            snackbarHostState.showSnackbar("Please fill in a trigger and a reply.")
+            snackbarHostState.showSnackbar("Please fill in the trigger and a reply.")
             showValidationError = false
         }
     }
@@ -470,7 +563,6 @@ fun EditorCard(
     }
 }
 
-// CLEANED UP MATCH ROW (No desc text)
 @Composable
 fun MatchOptionRow(title: String, type: String, currentType: String, onSelect: (String) -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { onSelect(type) }) {
