@@ -1,9 +1,13 @@
 package com.example.whatsappautomation
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -13,10 +17,10 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.whatsappautomation.data.AutomationRule
@@ -51,10 +55,11 @@ fun RuleEditorScreen(
     var screenOff by rememberSaveable(existingRule?.id) { mutableStateOf(existingRule?.requireScreenOff ?: false) }
     var charging by rememberSaveable(existingRule?.id) { mutableStateOf(existingRule?.requireCharging ?: false) }
     var dnd by rememberSaveable(existingRule?.id) { mutableStateOf(existingRule?.requireDnd ?: false) }
-    
-    // NEW: Time State
     var startTime by rememberSaveable(existingRule?.id) { mutableStateOf(existingRule?.startTime ?: "") }
     var endTime by rememberSaveable(existingRule?.id) { mutableStateOf(existingRule?.endTime ?: "") }
+
+    // Accordion State (Which card is open?)
+    var expandedCard by rememberSaveable { mutableStateOf("TRIGGER") }
 
     val replies = remember { mutableStateListOf<String>() }
     LaunchedEffect(existingRule) {
@@ -98,46 +103,21 @@ fun RuleEditorScreen(
                         val finalName = if (trigger.isBlank()) "Welcome Message" else trigger
                         
                         val newRule = existingRule?.copy(
-                            name = finalName,
-                            triggerKeyword = trigger,
-                            replyMessage = combinedReplies,
-                            matchType = matchType,
-                            targetChat = targetChat,
-                            replyMode = replyMode,
-                            delayMin = delayMin.toIntOrNull() ?: 0,
-                            delayMax = delayMax.toIntOrNull() ?: 0,
-                            askForName = askForName,
-                            promptQuestion = promptQuestion,
-                            confirmQuestion = confirmQuestion,
-                            retryQuestion = retryQuestion,
-                            successMessage = successMessage,
-                            assignTag = assignTag,
-                            requireScreenOff = screenOff,
-                            requireCharging = charging,
-                            requireDnd = dnd,
-                            startTime = startTime,
-                            endTime = endTime
+                            name = finalName, triggerKeyword = trigger, replyMessage = combinedReplies,
+                            matchType = matchType, targetChat = targetChat, replyMode = replyMode,
+                            delayMin = delayMin.toIntOrNull() ?: 0, delayMax = delayMax.toIntOrNull() ?: 0,
+                            askForName = askForName, promptQuestion = promptQuestion, confirmQuestion = confirmQuestion,
+                            retryQuestion = retryQuestion, successMessage = successMessage, assignTag = assignTag,
+                            requireScreenOff = screenOff, requireCharging = charging, requireDnd = dnd,
+                            startTime = startTime, endTime = endTime
                         ) ?: AutomationRule(
-                            name = finalName,
-                            triggerKeyword = trigger,
-                            replyMessage = combinedReplies,
-                            matchType = matchType,
-                            targetChat = targetChat,
-                            replyMode = replyMode,
-                            delayMin = delayMin.toIntOrNull() ?: 0,
-                            delayMax = delayMax.toIntOrNull() ?: 0,
-                            askForName = askForName,
-                            promptQuestion = promptQuestion,
-                            confirmQuestion = confirmQuestion,
-                            retryQuestion = retryQuestion,
-                            successMessage = successMessage,
-                            assignTag = assignTag,
-                            requireScreenOff = screenOff,
-                            requireCharging = charging,
-                            requireDnd = dnd,
-                            startTime = startTime,
-                            endTime = endTime,
-                            parentRuleId = parentId
+                            name = finalName, triggerKeyword = trigger, replyMessage = combinedReplies,
+                            matchType = matchType, targetChat = targetChat, replyMode = replyMode,
+                            delayMin = delayMin.toIntOrNull() ?: 0, delayMax = delayMax.toIntOrNull() ?: 0,
+                            askForName = askForName, promptQuestion = promptQuestion, confirmQuestion = confirmQuestion,
+                            retryQuestion = retryQuestion, successMessage = successMessage, assignTag = assignTag,
+                            requireScreenOff = screenOff, requireCharging = charging, requireDnd = dnd,
+                            startTime = startTime, endTime = endTime, parentRuleId = parentId
                         )
                         onSave(newRule)
                     } else {
@@ -156,10 +136,15 @@ fun RuleEditorScreen(
                 .padding(padding)
                 .verticalScroll(scrollState)
                 .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             // CARD 1: Received Message
-            EditorCard(title = "Received message", icon = Icons.Default.Message) {
+            EditorCard(
+                title = "Received message", 
+                icon = Icons.Default.Message, 
+                isExpanded = expandedCard == "TRIGGER",
+                onToggle = { expandedCard = if (expandedCard == "TRIGGER") "" else "TRIGGER" }
+            ) {
                 Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     OutlinedTextField(
                         value = trigger,
@@ -207,8 +192,13 @@ fun RuleEditorScreen(
                 MatchOptionRow("Welcome message", "Replies to first message from a non-contact", "WELCOME", matchType) { matchType = it }
             }
 
-            // CARD 2 & 3: Automatic Reply & Multiple Replies
-            EditorCard(title = "Automatic reply", icon = Icons.Default.Reply) {
+            // CARD 2: Automatic Reply
+            EditorCard(
+                title = "Automatic reply", 
+                icon = Icons.Default.Reply,
+                isExpanded = expandedCard == "REPLY",
+                onToggle = { expandedCard = if (expandedCard == "REPLY") "" else "REPLY" }
+            ) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     AssistChip(onClick = { insertVariable("name") }, label = { Text("{name}", fontSize = 10.sp) }, modifier = Modifier.padding(end = 4.dp))
                     AssistChip(onClick = { insertVariable("number") }, label = { Text("{number}", fontSize = 10.sp) })
@@ -282,8 +272,14 @@ fun RuleEditorScreen(
                 }
             }
 
-            // CARD 4: Save Lead
-            EditorCard(title = "Save lead", icon = Icons.Default.PersonAdd, titleColor = MaterialTheme.colorScheme.tertiary) {
+            // CARD 3: Save Lead
+            EditorCard(
+                title = "Save lead", 
+                icon = Icons.Default.PersonAdd, 
+                titleColor = MaterialTheme.colorScheme.tertiary,
+                isExpanded = expandedCard == "LEAD",
+                onToggle = { expandedCard = if (expandedCard == "LEAD") "" else "LEAD" }
+            ) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Text("Ask their name and save the number", fontSize = 14.sp, fontWeight = FontWeight.Medium)
                     Switch(checked = askForName, onCheckedChange = { askForName = it }, colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.tertiary))
@@ -308,8 +304,13 @@ fun RuleEditorScreen(
                 }
             }
 
-            // CARD 5: Conditions
-            EditorCard(title = "Conditions (optional)", icon = Icons.Default.Tune) {
+            // CARD 4: Conditions
+            EditorCard(
+                title = "Conditions (optional)", 
+                icon = Icons.Default.Tune,
+                isExpanded = expandedCard == "CONDITIONS",
+                onToggle = { expandedCard = if (expandedCard == "CONDITIONS") "" else "CONDITIONS" }
+            ) {
                 ConditionSwitchRow("Only reply if screen is off", screenOff) { screenOff = it }
                 ConditionSwitchRow("Only reply if device is charging", charging) { charging = it }
                 ConditionSwitchRow("Only reply if Do Not Disturb is on", dnd) { dnd = it }
@@ -339,9 +340,14 @@ fun RuleEditorScreen(
                 }
             }
 
-            // SECTION 6: SUBMENU
+            // CARD 5: Submenu
             if (existingRule != null) {
-                EditorCard(title = "Submenu / Conversation Flow", icon = Icons.Default.AccountTree) {
+                EditorCard(
+                    title = "Submenu / Conversation Flow", 
+                    icon = Icons.Default.AccountTree,
+                    isExpanded = expandedCard == "SUBMENU",
+                    onToggle = { expandedCard = if (expandedCard == "SUBMENU") "" else "SUBMENU" }
+                ) {
                     Text("Rules added here will trigger after the contact is saved, or if they choose an option.", fontSize = 12.sp)
                     Spacer(modifier = Modifier.height(8.dp))
                     childRules.forEach { child ->
@@ -381,6 +387,47 @@ fun RuleEditorScreen(
     }
 }
 
+// --- NEW COLLAPSIBLE CARD COMPOSABLE ---
+@Composable
+fun EditorCard(
+    title: String, 
+    icon: androidx.compose.ui.graphics.vector.ImageVector, 
+    titleColor: Color = MaterialTheme.colorScheme.primary, 
+    isExpanded: Boolean,
+    onToggle: () -> Unit,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    val rotation by animateFloatAsState(targetValue = if (isExpanded) 180f else 0f, animationSpec = tween(300))
+    
+    Card(
+        modifier = Modifier.fillMaxWidth().clickable { onToggle() }, 
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(icon, contentDescription = null, tint = titleColor, modifier = Modifier.size(24.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(text = title, fontWeight = FontWeight.Bold, color = titleColor, fontSize = 18.sp, modifier = Modifier.weight(1f))
+                Icon(
+                    imageVector = Icons.Default.KeyboardArrowDown, 
+                    contentDescription = "Expand", 
+                    tint = titleColor.copy(alpha = 0.7f),
+                    modifier = Modifier.rotate(rotation)
+                )
+            }
+            
+            // Smooth animation for expanding/collapsing
+            AnimatedVisibility(visible = isExpanded) {
+                Column {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    content()
+                }
+            }
+        }
+    }
+}
+
 @Composable
 fun MatchOptionRow(title: String, desc: String, type: String, currentType: String, onSelect: (String) -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { onSelect(type) }) {
@@ -409,24 +456,6 @@ fun ConditionSwitchRow(title: String, checked: Boolean, onCheckedChange: (Boolea
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
         Text(title, fontSize = 14.sp)
         Switch(checked = checked, onCheckedChange = onCheckedChange)
-    }
-}
-
-@Composable
-fun EditorCard(title: String, icon: androidx.compose.ui.graphics.vector.ImageVector, titleColor: Color = MaterialTheme.colorScheme.primary, content: @Composable ColumnScope.() -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth(), 
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(16.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 12.dp)) {
-                Icon(icon, contentDescription = null, tint = titleColor, modifier = Modifier.size(24.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(text = title, fontWeight = FontWeight.Bold, color = titleColor, fontSize = 18.sp)
-            }
-            content()
-        }
     }
 }
 
