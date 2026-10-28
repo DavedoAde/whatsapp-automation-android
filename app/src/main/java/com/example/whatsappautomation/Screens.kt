@@ -402,12 +402,17 @@ fun SettingsScreen() {
     val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
     val isBatteryOptimized = !powerManager.isIgnoringBatteryOptimizations(context.packageName)
 
-    // Permission Launcher for GET_ACCOUNTS
-    val accountsPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        if (isGranted) {
+    // FIXED: Ask for READ_CONTACTS and WRITE_CONTACTS instead of GET_ACCOUNTS
+    val permLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val readGranted = permissions[Manifest.permission.READ_CONTACTS] == true
+        val writeGranted = permissions[Manifest.permission.WRITE_CONTACTS] == true
+        
+        if (readGranted && writeGranted) {
             showSaveAccountDialog = true
+        } else {
+            // Optional: Show a message if they deny
         }
     }
 
@@ -511,10 +516,14 @@ fun SettingsScreen() {
                 
                 Row(
                     modifier = Modifier.fillMaxWidth().clickable { 
-                        if (ContextCompat.checkSelfPermission(context, Manifest.permission.GET_ACCOUNTS) == PackageManager.PERMISSION_GRANTED) {
+                        // FIXED: Check for READ_CONTACTS and WRITE_CONTACTS, not GET_ACCOUNTS
+                        val hasRead = ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED
+                        val hasWrite = ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_CONTACTS) == PackageManager.PERMISSION_GRANTED
+                        
+                        if (hasRead && hasWrite) {
                             showSaveAccountDialog = true
                         } else {
-                            accountsPermissionLauncher.launch(Manifest.permission.GET_ACCOUNTS)
+                            permLauncher.launch(arrayOf(Manifest.permission.READ_CONTACTS, Manifest.permission.WRITE_CONTACTS))
                         }
                     },
                     horizontalArrangement = Arrangement.SpaceBetween,
