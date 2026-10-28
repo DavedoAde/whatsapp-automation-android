@@ -96,7 +96,50 @@ fun RuleEditorScreen(
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
-        // REMOVED TOP BAR HERE - IT IS HANDLED BY MainActivity.kt
+        topBar = {
+            // STANDARDIZED TOP BAR FOR RULE EDITOR
+            TopAppBar(
+                title = { 
+                    Column {
+                        Text(if (existingRule == null) "Create Rule" else "Edit Rule", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                        if (label.isNotBlank()) {
+                            Text(label, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f))
+                        }
+                    }
+                },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.primary)
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { showMenu = true }) {
+                        Icon(Icons.Default.MoreVert, contentDescription = "Menu", tint = MaterialTheme.colorScheme.primary)
+                    }
+                    DropdownMenu(
+                        expanded = showMenu,
+                        onDismissRequest = { showMenu = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text(if (label.isBlank()) "Add label" else "Edit label") },
+                            onClick = { 
+                                showMenu = false
+                                tempLabel = label
+                                showLabelDialog = true 
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Specific versions") },
+                            onClick = { 
+                                showMenu = false
+                                showVersionsDialog = true 
+                            }
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
+            )
+        },
         floatingActionButton = {
             FloatingActionButton(
                 onClick = {
@@ -142,6 +185,7 @@ fun RuleEditorScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            // ... (The rest of the RuleEditor cards remain the same) ...
             EditorCard(
                 title = "Received message", 
                 icon = Icons.Default.Message, 
@@ -412,7 +456,6 @@ fun RuleEditorScreen(
         }
     }
 
-    // --- DIALOGS ---
     if (showLabelDialog) {
         AlertDialog(
             onDismissRequest = { showLabelDialog = false },
