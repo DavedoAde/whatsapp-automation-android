@@ -28,7 +28,6 @@ data class AutomationRule(
     val targetChat: String = "ALL", 
     val replyMode: String = "SINGLE", 
     
-    // NEW: Delay feature
     val delayMin: Int = 0,
     val delayMax: Int = 0,
     
@@ -44,4 +43,16 @@ data class AutomationRule(
     val requireDnd: Boolean = false,
     
     val parentRuleId: Long? = null 
+)
+
+// NEW: Activity Log Entity
+@Entity(tableName = "activity_logs")
+data class ActivityLog(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val timestamp: Long = System.currentTimeMillis(),
+    val senderName: String,
+    val incomingMessage: String,
+    val actionTaken: String, // "Replied", "No Match", "Lead Saved", "Error"
+    val replyText: String = "",
+    val isError: Boolean = false
 )
