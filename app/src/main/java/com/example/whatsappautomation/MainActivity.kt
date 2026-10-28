@@ -29,6 +29,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
@@ -60,9 +61,10 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val navController = rememberNavController()
+    val scope = rememberCoroutineScope()
     
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
-    val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
     
     val startDestination = if (PreferenceManager.isFirstLaunch(context)) "welcome" else Screen.Dashboard.route
 
@@ -136,205 +138,246 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
 
     var showGlobalMenu by remember { mutableStateOf(false) }
 
-    ModalNavigationDrawer(
-        drawerState = drawerState,
-        drawerContent = {
-            ModalDrawerSheet(
-                modifier = Modifier.fillMaxWidth(0.66f),
-                drawerContainerColor = MaterialTheme.colorScheme.surface,
-                drawerShape = MaterialTheme.shapes.large
-            ) {
-                Column(modifier = Modifier.padding(24.dp)) {
-                    Text("WhatsApp Automation", fontSize = 20.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    Text("Version 1.0", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+    // --- FILE PICKERS FOR IMPORT/EXPORT ---
+    val exportRulesLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json")
+    ) { uri: Uri? ->
+        if (uri != null) {
+            try {
+                val jsonString = RuleExporter.exportRulesToJson(viewModel.allRules.value)
+                context.contentResolver.openOutputStream(uri)?.use { outputStream ->
+                    outputStream.write(jsonString.toByteArray())
                 }
-                Divider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f), modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
-                
-                NavigationDrawerItem(
-                    icon = { Icon(Icons.Default.History, contentDescription = null) },
-                    label = { Text("Logs (Reply History)") },
-                    selected = currentRoute == Screen.Logs.route,
-                    onClick = { 
-                        navController.navigate(Screen.Logs.route) 
-                        scope.launch { drawerState.close() }
-                    },
-                    modifier = Modifier.padding(horizontal = 12.dp)
-                )
-                NavigationDrawerItem(
-                    icon = { Icon(Icons.Default.Settings, contentDescription = null) },
-                    label = { Text("Settings") },
-                    selected = currentRoute == Screen.Settings.route,
-                    onClick = { 
-                        navController.navigate(Screen.Settings.route)
-                        scope.launch { drawerState.close() }
-                    },
-                    modifier = Modifier.padding(horizontal = 12.dp)
-                )
+                scope.launch { snackbarHostState.showSnackbar("Rules exported successfully!") }
+            } catch (e: Exception) {
+                scope.launch { snackbarHostState.showSnackbar("Export failed: ${e.message}") }
             }
         }
-    ) {
-        Scaffold(
-            topBar = {
-                if (currentRoute != "welcome") {
-                    // GLOBAL COMPACT TOP BAR
-                    TopAppBar(
-                        title = { 
-                            Text(
-                                text = when (currentRoute) {
-                                    Screen.Dashboard.route -> "Dashboard"
-                                    Screen.Rules.route -> "Rules"
-                                    Screen.Contacts.route -> "Contacts"
-                                    Screen.Logs.route -> "Logs"
-                                    Screen.Settings.route -> "Settings"
-                                    "simulator" -> "Simulator"
-                                    else -> "Rule Editor" // For nested rule editor routes
-                                },
-                                color = MaterialTheme.colorScheme.primary, 
-                                style = MaterialTheme.typography.titleMedium
-                            ) 
-                        },
-                        navigationIcon = {
-                            if (isMainScreen) {
-                                IconButton(onClick = { scope.launch { drawerState.open() } }) {
-                                    Icon(Icons.Default.Menu, contentDescription = "Menu", tint = MaterialTheme.colorScheme.primary)
-                                }
-                            } else {
-                                IconButton(onClick = { navController.popBackStack() }) {
-                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.primary)
-                                }
-                            }
-                        },
-                        actions = {
-                            // Show Simulator & Switch ONLY on Main Screens
-                            if (isMainScreen) {
-                                IconButton(onClick = { navController.navigate("simulator") }) {
-                                    Icon(imageVector = Icons.AutoMirrored.Filled.Chat, contentDescription = "Simulator", tint = MaterialTheme.colorScheme.primary)
-                                }
-                                
-                                Switch(
-                                    checked = isAutomationActive,
-                                    onCheckedChange = { isChecked ->
-                                        if (isChecked) {
-                                            if (hasNotifAccess && hasContactAccess) {
-                                                viewModel.toggleAutomation(true)
-                                                val isOptimized = !powerManager.isIgnoringBatteryOptimizations(context.packageName)
-                                                if (isOptimized && !PreferenceManager.isBatteryIgnored(context)) { showBatteryDialog = true }
-                                            } else {
-                                                isTurningOnAutomation = true
-                                                showPermissionDialog = true
-                                            }
-                                        } else {
-                                            viewModel.toggleAutomation(false)
-                                            isTurningOnAutomation = false
-                                        }
-                                    },
-                                    modifier = Modifier.padding(end = 8.dp),
-                                    colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary, checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
-                                )
-                            }
+    }
 
-                            // Global Menu for Rules and Contacts
-                            if (currentRoute == Screen.Rules.route || currentRoute == Screen.Contacts.route) {
-                                IconButton(onClick = { showGlobalMenu = true }) {
-                                    Icon(Icons.Default.MoreVert, contentDescription = "More", tint = MaterialTheme.colorScheme.primary)
-                                }
-                                DropdownMenu(
-                                    expanded = showGlobalMenu,
-                                    onDismissRequest = { showGlobalMenu = false }
-                                ) {
-                                    if (currentRoute == Screen.Rules.route) {
-                                        DropdownMenuItem(
-                                            text = { Text("Import Rules") },
-                                            onClick = { showGlobalMenu = false /* Implement Import */ }
-                                        )
-                                        DropdownMenuItem(
-                                            text = { Text("Export All Rules") },
-                                            onClick = { showGlobalMenu = false /* Implement Export */ }
-                                        )
-                                    } else if (currentRoute == Screen.Contacts.route) {
-                                        DropdownMenuItem(
-                                            text = { Text("Export Contacts (CSV)") },
-                                            onClick = { 
-                                                showGlobalMenu = false
-                                                viewModel.triggerCsvExport() 
-                                            }
-                                        )
-                                    }
-                                }
-                            }
-                            
-                            // Logs clear action
-                            if (currentRoute == Screen.Logs.route) {
-                                TextButton(onClick = { viewModel.clearLogs() }) {
-                                    Text("Clear", color = MaterialTheme.colorScheme.error)
-                                }
-                            }
+    val importRulesLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            try {
+                val jsonString = context.contentResolver.openInputStream(uri)?.bufferedReader().use { it?.readText() }
+                if (jsonString != null) {
+                    viewModel.importRules(jsonString)
+                    scope.launch { snackbarHostState.showSnackbar("Rules imported successfully!") }
+                }
+            } catch (e: Exception) {
+                scope.launch { snackbarHostState.showSnackbar("Import failed: ${e.message}") }
+            }
+        }
+    }
+    // ----------------------------------------
+
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) }
+    ) { scaffoldPadding ->
+        ModalNavigationDrawer(
+            drawerState = drawerState,
+            drawerContent = {
+                ModalDrawerSheet(
+                    modifier = Modifier.fillMaxWidth(0.66f),
+                    drawerContainerColor = MaterialTheme.colorScheme.surface,
+                    drawerShape = MaterialTheme.shapes.large
+                ) {
+                    Column(modifier = Modifier.padding(24.dp)) {
+                        Text("WhatsApp Automation", fontSize = 20.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                        Text("Version 1.0", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                    }
+                    Divider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f), modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+                    
+                    NavigationDrawerItem(
+                        icon = { Icon(Icons.Default.History, contentDescription = null) },
+                        label = { Text("Logs (Reply History)") },
+                        selected = currentRoute == Screen.Logs.route,
+                        onClick = { 
+                            navController.navigate(Screen.Logs.route) 
+                            scope.launch { drawerState.close() }
                         },
-                        colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
+                        modifier = Modifier.padding(horizontal = 12.dp)
+                    )
+                    NavigationDrawerItem(
+                        icon = { Icon(Icons.Default.Settings, contentDescription = null) },
+                        label = { Text("Settings") },
+                        selected = currentRoute == Screen.Settings.route,
+                        onClick = { 
+                            navController.navigate(Screen.Settings.route)
+                            scope.launch { drawerState.close() }
+                        },
+                        modifier = Modifier.padding(horizontal = 12.dp)
                     )
                 }
-            },
-            bottomBar = {
-                if (isMainScreen) {
-                    NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
-                        bottomScreens.forEach { screen ->
-                            NavigationBarItem(
-                                icon = { Icon(screen.icon, contentDescription = screen.title) },
-                                label = { Text(screen.title) },
-                                selected = currentRoute == screen.route,
-                                colors = NavigationBarItemDefaults.colors(selectedIconColor = MaterialTheme.colorScheme.primary, selectedTextColor = MaterialTheme.colorScheme.primary, indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
-                                onClick = {
-                                    navController.navigate(screen.route) {
-                                        popUpTo(navController.graph.startDestinationId) { saveState = true }
-                                        launchSingleTop = true
-                                        restoreState = true
+            }
+        ) {
+            Scaffold(
+                modifier = Modifier.padding(scaffoldPadding),
+                topBar = {
+                    if (currentRoute != "welcome") {
+                        TopAppBar(
+                            title = { 
+                                Text(
+                                    text = when (currentRoute) {
+                                        Screen.Dashboard.route -> "Dashboard"
+                                        Screen.Rules.route -> "Rules"
+                                        Screen.Contacts.route -> "Contacts"
+                                        Screen.Logs.route -> "Logs"
+                                        Screen.Settings.route -> "Settings"
+                                        "simulator" -> "Simulator"
+                                        else -> "Rule Editor"
+                                    },
+                                    color = MaterialTheme.colorScheme.primary, 
+                                    style = MaterialTheme.typography.titleMedium
+                                ) 
+                            },
+                            navigationIcon = {
+                                if (isMainScreen) {
+                                    IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                                        Icon(Icons.Default.Menu, contentDescription = "Menu", tint = MaterialTheme.colorScheme.primary)
+                                    }
+                                } else {
+                                    IconButton(onClick = { navController.popBackStack() }) {
+                                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.primary)
                                     }
                                 }
-                            )
+                            },
+                            actions = {
+                                if (isMainScreen) {
+                                    IconButton(onClick = { navController.navigate("simulator") }) {
+                                        Icon(imageVector = Icons.AutoMirrored.Filled.Chat, contentDescription = "Simulator", tint = MaterialTheme.colorScheme.primary)
+                                    }
+                                    
+                                    Switch(
+                                        checked = isAutomationActive,
+                                        onCheckedChange = { isChecked ->
+                                            if (isChecked) {
+                                                if (hasNotifAccess && hasContactAccess) {
+                                                    viewModel.toggleAutomation(true)
+                                                    val isOptimized = !powerManager.isIgnoringBatteryOptimizations(context.packageName)
+                                                    if (isOptimized && !PreferenceManager.isBatteryIgnored(context)) { showBatteryDialog = true }
+                                                } else {
+                                                    isTurningOnAutomation = true
+                                                    showPermissionDialog = true
+                                                }
+                                            } else {
+                                                viewModel.toggleAutomation(false)
+                                                isTurningOnAutomation = false
+                                            }
+                                        },
+                                        modifier = Modifier.padding(end = 8.dp),
+                                        colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary, checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
+                                    )
+                                }
+
+                                if (currentRoute == Screen.Rules.route || currentRoute == Screen.Contacts.route) {
+                                    IconButton(onClick = { showGlobalMenu = true }) {
+                                        Icon(Icons.Default.MoreVert, contentDescription = "More", tint = MaterialTheme.colorScheme.primary)
+                                    }
+                                    DropdownMenu(
+                                        expanded = showGlobalMenu,
+                                        onDismissRequest = { showGlobalMenu = false }
+                                    ) {
+                                        if (currentRoute == Screen.Rules.route) {
+                                            DropdownMenuItem(
+                                                text = { Text("Import Rules (JSON)") },
+                                                onClick = { 
+                                                    showGlobalMenu = false
+                                                    importRulesLauncher.launch(arrayOf("application/json"))
+                                                }
+                                            )
+                                            DropdownMenuItem(
+                                                text = { Text("Export All Rules (JSON)") },
+                                                onClick = { 
+                                                    showGlobalMenu = false
+                                                    exportRulesLauncher.launch("WhatsApp_Rules_${System.currentTimeMillis()}.json")
+                                                }
+                                            )
+                                        } else if (currentRoute == Screen.Contacts.route) {
+                                            DropdownMenuItem(
+                                                text = { Text("Export Contacts (CSV)") },
+                                                onClick = { 
+                                                    showGlobalMenu = false
+                                                    viewModel.triggerCsvExport() 
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
+                                
+                                if (currentRoute == Screen.Logs.route) {
+                                    TextButton(onClick = { viewModel.clearLogs() }) {
+                                        Text("Clear", color = MaterialTheme.colorScheme.error)
+                                    }
+                                }
+                            },
+                            colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
+                        )
+                    }
+                },
+                bottomBar = {
+                    if (isMainScreen) {
+                        NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
+                            bottomScreens.forEach { screen ->
+                                NavigationBarItem(
+                                    icon = { Icon(screen.icon, contentDescription = screen.title) },
+                                    label = { Text(screen.title) },
+                                    selected = currentRoute == screen.route,
+                                    colors = NavigationBarItemDefaults.colors(selectedIconColor = MaterialTheme.colorScheme.primary, selectedTextColor = MaterialTheme.colorScheme.primary, indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
+                                    onClick = {
+                                        navController.navigate(screen.route) {
+                                            popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                            launchSingleTop = true
+                                            restoreState = true
+                                        }
+                                    }
+                                )
+                            }
                         }
                     }
                 }
-            }
-        ) { innerPadding ->
-            NavHost(
-                navController = navController,
-                startDestination = startDestination,
-                modifier = Modifier.padding(innerPadding),
-                enterTransition = { slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(400, easing = FastOutSlowInEasing)) },
-                exitTransition = { slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(400, easing = FastOutSlowInEasing)) },
-                popEnterTransition = { slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(400, easing = FastOutSlowInEasing)) },
-                popExitTransition = { slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(400, easing = FastOutSlowInEasing)) }
-            ) {
-                composable("welcome") {
-                    WelcomeScreen(onGetStartedClick = {
-                        PreferenceManager.setFirstLaunchCompleted(context)
-                        navController.navigate(Screen.Dashboard.route) { popUpTo("welcome") { inclusive = true } }
-                    })
-                }
-                
-                composable(Screen.Dashboard.route) { DashboardScreen(viewModel) }
-                composable(Screen.Rules.route) { RulesScreen(viewModel, onEditRule = { ruleId -> navController.navigate("rule_editor/$ruleId/0") }) }
-                composable(Screen.Contacts.route) { ContactsScreen(viewModel) }
-                composable(Screen.Logs.route) { LogsScreen(viewModel) }
-                composable(Screen.Settings.route) { SettingsScreen() }
-                composable("simulator") { SimulatorScreen(viewModel, onBack = { navController.popBackStack() }) }
-
-                composable(
-                    route = "rule_editor/{ruleId}/{parentId}",
-                    arguments = listOf(navArgument("ruleId") { type = NavType.LongType }, navArgument("parentId") { type = NavType.LongType })
-                ) { backStackEntry ->
-                    val ruleId = backStackEntry.arguments?.getLong("ruleId") ?: 0L
-                    val parentId = backStackEntry.arguments?.getLong("parentId") ?: 0L
-                    val existingRule = if (ruleId == 0L) null else viewModel.allRules.value.find { it.id == ruleId }
-                    val childRules = viewModel.allRules.value.filter { it.parentRuleId == ruleId }
+            ) { innerPadding ->
+                NavHost(
+                    navController = navController,
+                    startDestination = startDestination,
+                    modifier = Modifier.padding(innerPadding),
+                    enterTransition = { slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(400, easing = FastOutSlowInEasing)) },
+                    exitTransition = { slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(400, easing = FastOutSlowInEasing)) },
+                    popEnterTransition = { slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(400, easing = FastOutSlowInEasing)) },
+                    popExitTransition = { slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(400, easing = FastOutSlowInEasing)) }
+                ) {
+                    composable("welcome") {
+                        WelcomeScreen(onGetStartedClick = {
+                            PreferenceManager.setFirstLaunchCompleted(context)
+                            navController.navigate(Screen.Dashboard.route) { popUpTo("welcome") { inclusive = true } }
+                        })
+                    }
                     
-                    RuleEditorScreen(
-                        existingRule = existingRule, parentId = if (parentId == 0L) null else parentId, childRules = childRules,
-                        onBack = { navController.popBackStack() },
-                        onSave = { updatedRule -> viewModel.saveRule(updatedRule); navController.popBackStack() },
-                        onAddChildRule = { parentRuleId -> navController.navigate("rule_editor/0/$parentRuleId") },
-                        onEditChildRule = { childId -> navController.navigate("rule_editor/$childId/0") }
-                    )
+                    composable(Screen.Dashboard.route) { DashboardScreen(viewModel) }
+                    composable(Screen.Rules.route) { RulesScreen(viewModel, onEditRule = { ruleId -> navController.navigate("rule_editor/$ruleId/0") }) }
+                    composable(Screen.Contacts.route) { ContactsScreen(viewModel) }
+                    composable(Screen.Logs.route) { LogsScreen(viewModel) }
+                    composable(Screen.Settings.route) { SettingsScreen() }
+                    composable("simulator") { SimulatorScreen(viewModel, onBack = { navController.popBackStack() }) }
+
+                    composable(
+                        route = "rule_editor/{ruleId}/{parentId}",
+                        arguments = listOf(navArgument("ruleId") { type = NavType.LongType }, navArgument("parentId") { type = NavType.LongType })
+                    ) { backStackEntry ->
+                        val ruleId = backStackEntry.arguments?.getLong("ruleId") ?: 0L
+                        val parentId = backStackEntry.arguments?.getLong("parentId") ?: 0L
+                        val existingRule = if (ruleId == 0L) null else viewModel.allRules.value.find { it.id == ruleId }
+                        val childRules = viewModel.allRules.value.filter { it.parentRuleId == ruleId }
+                        
+                        RuleEditorScreen(
+                            existingRule = existingRule, parentId = if (parentId == 0L) null else parentId, childRules = childRules,
+                            onBack = { navController.popBackStack() },
+                            onSave = { updatedRule -> viewModel.saveRule(updatedRule); navController.popBackStack() },
+                            onAddChildRule = { parentRuleId -> navController.navigate("rule_editor/0/$parentRuleId") },
+                            onEditChildRule = { childId -> navController.navigate("rule_editor/$childId/0") }
+                        )
+                    }
                 }
             }
         }
