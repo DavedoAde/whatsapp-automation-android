@@ -93,6 +93,20 @@ fun ContactsScreen(viewModel: AppViewModel) {
         }
     }
 
+    // --- LISTEN FOR TOP BAR EXPORT TRIGGER ---
+    val triggerExport by viewModel.triggerCsvExport.collectAsState()
+    LaunchedEffect(triggerExport) {
+        if (triggerExport) {
+            if (contacts.isNotEmpty()) {
+                createDocumentLauncher.launch("WhatsApp_Leads_${System.currentTimeMillis()}.csv")
+            } else {
+                scope.launch { snackbarHostState.showSnackbar("No contacts to export.") }
+            }
+            viewModel.resetCsvExportTrigger()
+        }
+    }
+    // -----------------------------------------
+
     val filteredContacts = contacts.filter { 
         it.name.contains(searchQuery, ignoreCase = true) || it.phoneNumber.contains(searchQuery)
     }
@@ -101,26 +115,15 @@ fun ContactsScreen(viewModel: AppViewModel) {
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = { searchQuery = it },
-                    label = { Text("Search contacts...") },
-                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                IconButton(
-                    onClick = { 
-                        if (contacts.isNotEmpty()) createDocumentLauncher.launch("WhatsApp_Leads_${System.currentTimeMillis()}.csv") 
-                        else scope.launch { snackbarHostState.showSnackbar("No contacts to export.") }
-                    },
-                    modifier = Modifier.background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), RoundedCornerShape(12.dp)).size(56.dp)
-                ) {
-                    Icon(Icons.Default.Download, contentDescription = "Export CSV", tint = MaterialTheme.colorScheme.primary)
-                }
-            }
+            // Search bar only (Export moved to top bar)
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                label = { Text("Search contacts...") },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
+            )
             
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -336,40 +339,20 @@ fun RuleCard(rule: AutomationRule, onToggleClick: () -> Unit, onEditClick: () ->
     }
 }
 
-// --- LOGS ---
-@OptIn(ExperimentalMaterial3Api::class)
+// --- LOGS (Without Top Bar - Handled by MainActivity) ---
 @Composable
-fun LogsScreen(viewModel: AppViewModel, onBack: () -> Unit) {
+fun LogsScreen(viewModel: AppViewModel) {
     val logs by viewModel.allLogs.collectAsState()
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Activity Logs", fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                actions = {
-                    TextButton(onClick = { viewModel.clearLogs() }) {
-                        Text("Clear", color = MaterialTheme.colorScheme.error)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
-            )
-        }
-    ) { padding ->
-        Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
-            if (logs.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("No activity yet.", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
-                }
-            } else {
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(logs) { log ->
-                        LogCard(log)
-                    }
+    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+        if (logs.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("No activity yet.", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
+            }
+        } else {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(logs) { log ->
+                    LogCard(log)
                 }
             }
         }
@@ -404,10 +387,9 @@ fun LogCard(log: ActivityLog) {
     }
 }
 
-// --- SETTINGS (Redesigned) ---
-@OptIn(ExperimentalMaterial3Api::class)
+// --- SETTINGS (Without Top Bar - Handled by MainActivity) ---
 @Composable
-fun SettingsScreen(onBack: () -> Unit) {
+fun SettingsScreen() {
     val context = LocalContext.current
     
     var showWaDialog by remember { mutableStateOf(false) }
@@ -418,108 +400,93 @@ fun SettingsScreen(onBack: () -> Unit) {
     val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
     val isBatteryOptimized = !powerManager.isIgnoringBatteryOptimizations(context.packageName)
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Settings", fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
-            )
-        }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(16.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Version of WA", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    
-                    Row(
-                        modifier = Modifier.fillMaxWidth().clickable { showWaDialog = true },
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("Choose WA version", fontSize = 16.sp)
-                        Text(
-                            text = if (currentWaVersion == "ANY") "Any" else if (currentWaVersion == "ORIGINAL") "WA (Original)" else "WA Business",
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                            fontSize = 14.sp
-                        )
-                    }
-                }
-            }
-
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Multi-User support", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    Text("Reply to WA versions of other users on this device (Dual App).", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                        Switch(
-                            checked = isMultiUser, 
-                            onCheckedChange = { 
-                                isMultiUser = it
-                                PreferenceManager.setMultiUserEnabled(context, it)
-                            }
-                        )
-                    }
-                }
-            }
-
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Notifications", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    Text("Get notified when the app has replied to a chat.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                        Switch(
-                            checked = isNotificationsEnabled, 
-                            onCheckedChange = { 
-                                isNotificationsEnabled = it
-                                PreferenceManager.setNotificationsEnabled(context, it)
-                            }
-                        )
-                    }
-                }
-            }
-
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Battery Optimization", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("Version of WA", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth().clickable { showWaDialog = true },
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Choose WA version", fontSize = 16.sp)
                     Text(
-                        text = if (isBatteryOptimized) "Your phone is restricting background apps." else "Unrestricted. The app will work reliably.", 
-                        fontSize = 12.sp, 
-                        color = if (isBatteryOptimized) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        text = if (currentWaVersion == "ANY") "Any" else if (currentWaVersion == "ORIGINAL") "WA (Original)" else "WA Business",
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                        fontSize = 14.sp
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    if (isBatteryOptimized) {
-                        Button(
-                            onClick = {
-                                try {
-                                    val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
-                                    intent.data = Uri.parse("package:${context.packageName}")
-                                    context.startActivity(intent)
-                                } catch (e: Exception) {
-                                    val fallbackIntent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
-                                    fallbackIntent.data = Uri.parse("package:${context.packageName}")
-                                    context.startActivity(fallbackIntent)
-                                }
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                        ) {
-                            Text("Disable Optimization")
+                }
+            }
+        }
+
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("Multi-User support", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Text("Reply to WA versions of other users on this device (Dual App).", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    Switch(
+                        checked = isMultiUser, 
+                        onCheckedChange = { 
+                            isMultiUser = it
+                            PreferenceManager.setMultiUserEnabled(context, it)
                         }
+                    )
+                }
+            }
+        }
+
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("Notifications", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Text("Get notified when the app has replied to a chat.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    Switch(
+                        checked = isNotificationsEnabled, 
+                        onCheckedChange = { 
+                            isNotificationsEnabled = it
+                            PreferenceManager.setNotificationsEnabled(context, it)
+                        }
+                    )
+                }
+            }
+        }
+
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("Battery Optimization", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Text(
+                    text = if (isBatteryOptimized) "Your phone is restricting background apps." else "Unrestricted. The app will work reliably.", 
+                    fontSize = 12.sp, 
+                    color = if (isBatteryOptimized) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                if (isBatteryOptimized) {
+                    Button(
+                        onClick = {
+                            try {
+                                val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+                                intent.data = Uri.parse("package:${context.packageName}")
+                                context.startActivity(intent)
+                            } catch (e: Exception) {
+                                val fallbackIntent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                                fallbackIntent.data = Uri.parse("package:${context.packageName}")
+                                context.startActivity(fallbackIntent)
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                    ) {
+                        Text("Disable Optimization")
                     }
                 }
             }
