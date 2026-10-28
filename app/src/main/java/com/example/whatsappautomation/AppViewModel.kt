@@ -68,7 +68,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // --- NEW: PAUSE AND IGNORE ---
     fun pauseContact(name: String, minutes: Int) {
         viewModelScope.launch {
             val pauseUntil = System.currentTimeMillis() + (minutes * 60 * 1000L)
@@ -86,9 +85,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     suspend fun simulateMessage(message: String): String {
         val allRulesList = allRules.value
-        
-        // ... (Simulation logic remains the same, no pause logic needed here because it's just a test) ...
-        // Paste the simulateMessage function here EXACTLY as it is in your current AppViewModel.kt
         
         when (BotStateManager.currentLeadState) {
             LeadCaptureState.AWAITING_NAME -> {
@@ -136,7 +132,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
         if (BotStateManager.currentMenuId != null) {
             val childRules = allRulesList.filter { it.parentRuleId == BotStateManager.currentMenuId && it.isActive }
-            val matchedChild = RuleEngine.findMatchingRule(message, childRules)
+            // Bypass conditions for simulator
+            val matchedChild = RuleEngine.findMatchingRule(getApplication(), message, childRules, checkConditions = false)
 
             if (matchedChild != null) {
                 if (matchedChild.delayMax > 0) {
@@ -161,7 +158,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         val topLevelRules = allRulesList.filter { it.parentRuleId == null }
-        val matchedRule = RuleEngine.findMatchingRule(message, topLevelRules)
+        // Bypass conditions for simulator
+        val matchedRule = RuleEngine.findMatchingRule(getApplication(), message, topLevelRules, checkConditions = false)
         
         return if (matchedRule != null) {
             if (matchedRule.delayMax > 0) {
