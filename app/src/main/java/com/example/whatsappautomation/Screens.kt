@@ -97,7 +97,7 @@ fun ContactsScreen(viewModel: AppViewModel) {
     LaunchedEffect(triggerExport) {
         if (triggerExport) {
             if (contacts.isNotEmpty()) {
-                createDocumentLauncher.launch("WhatsApp_Leads_${System.currentTimeMillis()}.csv")
+                createDocumentLauncher.launch("WAcopilot_Leads_${System.currentTimeMillis()}.csv")
             } else {
                 scope.launch { snackbarHostState.showSnackbar("No contacts to export.") }
             }
