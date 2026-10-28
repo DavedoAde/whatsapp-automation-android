@@ -97,11 +97,11 @@ fun RuleEditorScreen(
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            // STANDARDIZED TOP BAR FOR RULE EDITOR
+            // PERFECTED TOP BAR (Matches MainActivity)
             TopAppBar(
                 title = { 
-                    Column {
-                        Text(if (existingRule == null) "Create Rule" else "Edit Rule", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    Column(modifier = Modifier.padding(start = 8.dp)) {
+                        Text(if (existingRule == null) "Create Rule" else "Edit Rule", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.primary)
                         if (label.isNotBlank()) {
                             Text(label, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f))
                         }
@@ -137,7 +137,7 @@ fun RuleEditorScreen(
                         )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
             )
         },
         floatingActionButton = {
@@ -185,7 +185,6 @@ fun RuleEditorScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // ... (The rest of the RuleEditor cards remain the same) ...
             EditorCard(
                 title = "Received message", 
                 icon = Icons.Default.Message, 
