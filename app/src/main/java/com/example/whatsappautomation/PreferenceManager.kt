@@ -13,8 +13,9 @@ object PreferenceManager {
     private const val KEY_MULTI_USER = "multi_user_enabled"
     private const val KEY_NOTIFICATIONS_ENABLED = "notifications_enabled"
     
-    // NEW KEY
     private const val KEY_SAVE_ACCOUNT = "save_account"
+    // NEW KEY: Stores the specific email (e.g., user@gmail.com)
+    private const val KEY_GOOGLE_ACCOUNT_NAME = "google_account_name"
 
     private fun getPrefs(context: Context): SharedPreferences {
         return context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
@@ -68,12 +69,20 @@ object PreferenceManager {
         getPrefs(context).edit().putBoolean(KEY_NOTIFICATIONS_ENABLED, enabled).apply()
     }
 
-    // --- NEW SAVE ACCOUNT LOGIC ---
     fun getSaveAccount(context: Context): String {
         return getPrefs(context).getString(KEY_SAVE_ACCOUNT, "LOCAL") ?: "LOCAL"
     }
 
     fun setSaveAccount(context: Context, accountType: String) {
         getPrefs(context).edit().putString(KEY_SAVE_ACCOUNT, accountType).apply()
+    }
+
+    // --- NEW: Get and Set the specific Google Email ---
+    fun getGoogleAccountName(context: Context): String {
+        return getPrefs(context).getString(KEY_GOOGLE_ACCOUNT_NAME, "") ?: ""
+    }
+
+    fun setGoogleAccountName(context: Context, accountName: String) {
+        getPrefs(context).edit().putString(KEY_GOOGLE_ACCOUNT_NAME, accountName).apply()
     }
 }
