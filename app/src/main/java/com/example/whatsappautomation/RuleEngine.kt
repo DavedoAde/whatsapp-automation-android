@@ -5,7 +5,6 @@ import com.example.whatsappautomation.data.AutomationRule
 
 object RuleEngine {
     
-    // Added Context and checkConditions flag
     fun findMatchingRule(
         context: Context, 
         message: String, 
@@ -18,14 +17,17 @@ object RuleEngine {
 
         for (rule in activeRules) {
             
-            // 1. Check Hardware Conditions First
+            // 1. Check Hardware Conditions
             if (checkConditions) {
                 if (rule.requireScreenOff && !ConditionChecker.isScreenOff(context)) continue
                 if (rule.requireCharging && !ConditionChecker.isCharging(context)) continue
                 if (rule.requireDnd && !ConditionChecker.isDndActive(context)) continue
+                
+                // 2. Check Time Conditions
+                if (!ConditionChecker.isWithinTimeRange(rule.startTime, rule.endTime)) continue
             }
 
-            // 2. Check Text Matching
+            // 3. Check Text Matching
             val isMatch = if (rule.triggerKeyword.trim() == "*") {
                 true // Catch-all
             } else {
