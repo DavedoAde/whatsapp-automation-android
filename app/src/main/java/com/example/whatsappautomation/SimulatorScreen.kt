@@ -43,7 +43,7 @@ fun SimulatorScreen(viewModel: AppViewModel, onBack: () -> Unit) {
 
     LaunchedEffect(Unit) {
         if (messages.isEmpty()) {
-            messages.add(ChatMessage("Hello, I'm your AutoResponder! You can test the rules by sending messages to this chat.", false))
+            messages.add(ChatMessage("Hello, I'm your WAcopilot! You can test the rules by sending messages to this chat.", false))
         }
     }
 
@@ -57,14 +57,13 @@ fun SimulatorScreen(viewModel: AppViewModel, onBack: () -> Unit) {
         AlertDialog(
             onDismissRequest = { showOffDialog = false; onBack() },
             title = { Text("Test your rules") },
-            text = { Text("AutoResponder is off. Please activate it using the switch at the top.") },
+            text = { Text("WAcopilot is off. Please activate it using the switch at the top.") },
             confirmButton = {
                 Button(onClick = { showOffDialog = false; onBack() }) { Text("OK") }
             }
         )
     }
 
-    // Scaffold WITHOUT a topBar
     Scaffold(
         bottomBar = {
             Row(
@@ -114,27 +113,18 @@ fun SimulatorScreen(viewModel: AppViewModel, onBack: () -> Unit) {
             }
         }
     ) { padding ->
-        Column(modifier = Modifier.fillMaxSize().padding(padding).background(Color(0xFF0B141A))) {
-            // Chat Header (Mini profile bar inside the chat)
-            Row(
-                modifier = Modifier.fillMaxWidth().background(Color(0xFF1F2C34)).padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Surface(shape = CircleShape, color = Color(0xFF00A884), modifier = Modifier.size(40.dp)) {
-                    Box(contentAlignment = Alignment.Center) { Text("🤖", fontSize = 20.sp) }
-                }
-                Spacer(modifier = Modifier.width(12.dp))
-                Column {
-                    Text("AutoResponder", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFFE9EDEF))
-                    Text(if (isBotTyping) "typing..." else "Online", fontSize = 12.sp, color = Color(0xFF00A884))
-                }
-            }
-
+        // NO SECONDARY HEADER. Just the chat list directly on the background.
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .background(Color(0xFF0B141A)) // WhatsApp Dark Mode Background
+        ) {
             LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding = PaddingValues(vertical = 8.dp)
+                contentPadding = PaddingValues(vertical = 16.dp)
             ) {
                 items(messages) { message ->
                     ChatBubble(message)
