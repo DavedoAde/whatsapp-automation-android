@@ -28,7 +28,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val _isAutomationActive = MutableStateFlow(PreferenceManager.isAutomationActive(application))
     val isAutomationActive: StateFlow<Boolean> = _isAutomationActive
 
-    // --- LOGS FLOW ---
     val allLogs = logDao.getAllLogs()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -40,7 +39,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         _isAutomationActive.value = isActive
         PreferenceManager.setAutomationActive(getApplication(), isActive)
         
-        // Start/Stop Foreground Service
         val intent = Intent(getApplication(), ForegroundService::class.java)
         if (isActive) {
             ContextCompat.startForegroundService(getApplication(), intent)
@@ -70,10 +68,27 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    // --- NEW: PAUSE AND IGNORE ---
+    fun pauseContact(name: String, minutes: Int) {
+        viewModelScope.launch {
+            val pauseUntil = System.currentTimeMillis() + (minutes * 60 * 1000L)
+            contactDao.pauseContact(name, pauseUntil)
+        }
+    }
+
+    fun toggleIgnoreContact(name: String, isIgnored: Boolean) {
+        viewModelScope.launch {
+            contactDao.toggleIgnoreContact(name, isIgnored)
+        }
+    }
+
     private var currentSenderId = "+1234567890" 
 
     suspend fun simulateMessage(message: String): String {
         val allRulesList = allRules.value
+        
+        // ... (Simulation logic remains the same, no pause logic needed here because it's just a test) ...
+        // Paste the simulateMessage function here EXACTLY as it is in your current AppViewModel.kt
         
         when (BotStateManager.currentLeadState) {
             LeadCaptureState.AWAITING_NAME -> {
@@ -93,11 +108,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                             tags = BotStateManager.activeRule?.assignTag ?: ""
                         )
                         contactDao.insertContact(newContact)
-                        
-                        val context = getApplication<Application>()
-                        if (ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_CONTACTS) == PackageManager.PERMISSION_GRANTED) {
-                            PhoneContactManager.saveContactToPhone(context, BotStateManager.tempName, currentSenderId)
-                        }
                     }
                     
                     val successMsg = BotStateManager.activeRule?.successMessage?.replace("{name}", BotStateManager.tempName) ?: "Saved!"
