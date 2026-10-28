@@ -95,14 +95,25 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
     var showPermissionDialog by remember { mutableStateOf(false) }
     var isTurningOnAutomation by remember { mutableStateOf(false) }
 
+    // Launcher to ask for Contacts permissions
     val contactPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        hasContactAccess = isGranted
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val readGranted = permissions[Manifest.permission.READ_CONTACTS] == true
+        val writeGranted = permissions[Manifest.permission.WRITE_CONTACTS] == true
+        hasContactAccess = readGranted && writeGranted
+        
         if (isTurningOnAutomation && hasNotifAccess && hasContactAccess) {
             viewModel.toggleAutomation(true)
             showPermissionDialog = false
             isTurningOnAutomation = false
+        }
+    }
+
+    // Ask for permissions on first launch if missing
+    LaunchedEffect(Unit) {
+        if (!hasContactAccess) {
+            contactPermissionLauncher.launch(arrayOf(Manifest.permission.READ_CONTACTS, Manifest.permission.WRITE_CONTACTS))
         }
     }
 
@@ -408,7 +419,9 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("Contact Access", modifier = Modifier.weight(1f))
                         if (!hasContactAccess) {
-                            TextButton(onClick = { contactPermissionLauncher.launch(Manifest.permission.WRITE_CONTACTS) }) { Text("Grant") }
+                            TextButton(onClick = { 
+                                contactPermissionLauncher.launch(arrayOf(Manifest.permission.READ_CONTACTS, Manifest.permission.WRITE_CONTACTS)) 
+                            }) { Text("Grant") }
                         }
                     }
                 }
@@ -460,7 +473,9 @@ fun checkNotificationAccess(context: Context): Boolean {
 }
 
 fun checkContactAccess(context: Context): Boolean {
-    return ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_CONTACTS) == PackageManager.PERMISSION_GRANTED
+    val readGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED
+    val writeGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_CONTACTS) == PackageManager.PERMISSION_GRANTED
+    return readGranted && writeGranted
 }
 
 @Composable
