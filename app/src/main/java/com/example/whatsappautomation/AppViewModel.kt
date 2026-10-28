@@ -31,7 +31,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val allLogs = logDao.getAllLogs()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // Bridge for CSV Export from Top Bar
     private val _triggerCsvExport = MutableStateFlow(false)
     val triggerCsvExport: StateFlow<Boolean> = _triggerCsvExport
 
@@ -94,6 +93,18 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             contactDao.toggleIgnoreContact(name, isIgnored)
         }
     }
+
+    // --- NEW IMPORT/EXPORT LOGIC ---
+    fun importRules(jsonString: String) {
+        viewModelScope.launch {
+            val importedRules = RuleExporter.importRulesFromJson(jsonString)
+            for (rule in importedRules) {
+                // Insert with ID = 0 to auto-generate new IDs
+                ruleDao.insertRule(rule.copy(id = 0)) 
+            }
+        }
+    }
+    // -------------------------------
 
     private var currentSenderId = "+1234567890" 
 
