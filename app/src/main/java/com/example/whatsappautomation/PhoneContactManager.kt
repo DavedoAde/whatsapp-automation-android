@@ -3,29 +3,27 @@ package com.example.whatsappautomation
 import android.content.ContentProviderOperation
 import android.content.Context
 import android.provider.ContactsContract
-import android.provider.ContactsContract.RawContacts.DefaultAccount
-import android.provider.ContactsContract.RawContacts.DefaultAccount.DefaultAccountAndState
 import android.util.Log
 
 object PhoneContactManager {
     data class ContactAccount(val name: String?, val type: String?)
 
-    // A result class to hold success status and any error message
-    data class SaveResult(val isSuccess: Boolean, val errorMessage: String? = null)
-
-    // 1. Fetch accounts reliably
+    // 1. Fetch accounts reliably using ContactsContract.Settings
     fun getAccounts(context: Context): List<ContactAccount> {
         val list = mutableListOf<ContactAccount>()
         list.add(ContactAccount(null, null)) // Phone only
 
-        val defaultAccountAndState = DefaultAccount.getDefaultAccountForNewContacts(context.contentResolver)
-        if (defaultAccountAndState.state == DefaultAccountAndState.DEFAULT_ACCOUNT_STATE_CLOUD) {
-            val account = defaultAccountAndState.account
-            if (account != null && list.none { it.name == account.name }) {
-                list.add(ContactAccount(account.name, account.type))
+        try {
+            // Use getDefaultAccount which is supported on API 33+
+            val defaultAccount = ContactsContract.Settings.getDefaultAccount(context.contentResolver)
+            if (defaultAccount != null && list.none { it.name == defaultAccount.name }) {
+                list.add(ContactAccount(defaultAccount.name, defaultAccount.type))
             }
+        } catch (e: Exception) {
+            Log.e("PhoneContactManager", "Error getting default account", e)
         }
 
+        // Fallback: Query Settings table for other Google accounts
         try {
             val cursor = context.contentResolver.query(
                 ContactsContract.Settings.CONTENT_URI,
@@ -88,4 +86,6 @@ object PhoneContactManager {
             SaveResult(isSuccess = false, errorMessage = e.localizedMessage ?: "Unknown error")
         }
     }
+
+    data class SaveResult(val isSuccess: Boolean, val errorMessage: String? = null)
 }
