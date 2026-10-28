@@ -13,7 +13,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.core.FastOutSlowInEasing // ADDED
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
@@ -249,24 +249,23 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
                 composable(Screen.Rules.route) { RulesScreen(viewModel, onEditRule = { ruleId -> navController.navigate("rule_editor/$ruleId/0") }) }
                 composable(Screen.Contacts.route) { ContactsScreen(viewModel) }
                 
-                // FIXED: Added pop transitions for Logs
+                // FIXED: Smooth 500ms animations with Easing curve
                 composable(
                     route = Screen.Logs.route,
-                    enterTransition = { slideInHorizontally(initialOffsetX = { -it }, animationSpec = tween(300)) },
-                    exitTransition = { slideOutHorizontally(targetOffsetX = { -it }, animationSpec = tween(300)) },
-                    popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }, animationSpec = tween(300)) },
-                    popExitTransition = { slideOutHorizontally(targetOffsetX = { it }, animationSpec = tween(300)) }
+                    enterTransition = { slideInHorizontally(initialOffsetX = { -it }, animationSpec = tween(500, easing = FastOutSlowInEasing)) },
+                    exitTransition = { slideOutHorizontally(targetOffsetX = { -it }, animationSpec = tween(500, easing = FastOutSlowInEasing)) },
+                    popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }, animationSpec = tween(500, easing = FastOutSlowInEasing)) },
+                    popExitTransition = { slideOutHorizontally(targetOffsetX = { it }, animationSpec = tween(500, easing = FastOutSlowInEasing)) }
                 ) { 
                     LogsScreen(viewModel, onBack = { navController.popBackStack() }) 
                 }
                 
-                // FIXED: Added pop transitions for Settings
                 composable(
                     route = Screen.Settings.route,
-                    enterTransition = { slideInHorizontally(initialOffsetX = { -it }, animationSpec = tween(300)) },
-                    exitTransition = { slideOutHorizontally(targetOffsetX = { -it }, animationSpec = tween(300)) },
-                    popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }, animationSpec = tween(300)) },
-                    popExitTransition = { slideOutHorizontally(targetOffsetX = { it }, animationSpec = tween(300)) }
+                    enterTransition = { slideInHorizontally(initialOffsetX = { -it }, animationSpec = tween(500, easing = FastOutSlowInEasing)) },
+                    exitTransition = { slideOutHorizontally(targetOffsetX = { -it }, animationSpec = tween(500, easing = FastOutSlowInEasing)) },
+                    popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }, animationSpec = tween(500, easing = FastOutSlowInEasing)) },
+                    popExitTransition = { slideOutHorizontally(targetOffsetX = { it }, animationSpec = tween(500, easing = FastOutSlowInEasing)) }
                 ) { 
                     SettingsScreen(onBack = { navController.popBackStack() }) 
                 }
