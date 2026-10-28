@@ -82,6 +82,8 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
         Screen.Contacts.route, 
         Screen.Rules.route
     )
+    
+    val isRuleEditor = currentRoute?.startsWith("rule_editor") == true
 
     val isAutomationActive by viewModel.isAutomationActive.collectAsState()
     
@@ -211,7 +213,8 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
         ) {
             Scaffold(
                 topBar = {
-                    if (currentRoute != "welcome") {
+                    // STANDARDIZED GLOBAL TOP BAR
+                    if (currentRoute != "welcome" && !isRuleEditor) {
                         TopAppBar(
                             title = { 
                                 Text(
@@ -222,10 +225,11 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
                                         Screen.Logs.route -> "Logs"
                                         Screen.Settings.route -> "Settings"
                                         "simulator" -> "Simulator"
-                                        else -> "Rule Editor"
+                                        else -> ""
                                     },
                                     color = MaterialTheme.colorScheme.primary, 
-                                    style = MaterialTheme.typography.titleMedium
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
                                 ) 
                             },
                             navigationIcon = {
@@ -305,6 +309,13 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
                                 if (currentRoute == Screen.Logs.route) {
                                     TextButton(onClick = { viewModel.clearLogs() }) {
                                         Text("Clear", color = MaterialTheme.colorScheme.error)
+                                    }
+                                }
+
+                                // DUMMY 3-DOT FOR SETTINGS
+                                if (currentRoute == Screen.Settings.route) {
+                                    IconButton(onClick = { /* Add Settings menu later */ }) {
+                                        Icon(Icons.Default.MoreVert, contentDescription = "More", tint = MaterialTheme.colorScheme.primary)
                                     }
                                 }
                             },
