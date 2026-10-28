@@ -7,6 +7,7 @@ import android.os.Bundle
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Log
+import com.example.whatsappautomation.data.ActivityLog
 import com.example.whatsappautomation.data.AppDatabase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -29,21 +30,16 @@ class WhatsAppListenerService : NotificationListenerService() {
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         val packageName = sbn.packageName
         
-        // 1. STOP IF MASTER SWITCH IS OFF
-        if (!PreferenceManager.isAutomationActive(applicationContext)) {
-            return
-        }
+        if (!PreferenceManager.isAutomationActive(applicationContext)) return
         
-        // 2. CHECK WHICH WHATSAPP VERSION IS ENABLED IN SETTINGS
         if (packageName == "com.whatsapp") {
             if (!PreferenceManager.isWaOriginalEnabled(applicationContext)) return
         } else if (packageName == "com.whatsapp.w4b") {
             if (!PreferenceManager.isWaBusinessEnabled(applicationContext)) return
         } else {
-            return // Not a WhatsApp package
+            return 
         }
         
-        // 3. IGNORE GROUP SUMMARIES AND ONGOING EVENTS
         if ((sbn.notification.flags and Notification.FLAG_GROUP_SUMMARY) != 0) return
         if ((sbn.notification.flags and Notification.FLAG_ONGOING_EVENT) != 0) return
 
@@ -60,23 +56,15 @@ class WhatsAppListenerService : NotificationListenerService() {
             }
         }
 
-        if (messageText.isBlank()) {
-            Log.d(TAG, "Message text is blank. Ignoring.")
-            return
-        }
-        
-        Log.d(TAG, "Received message from $senderName: $messageText")
+        if (messageText.isBlank()) return
 
-        // 4. PREVENT DUPLICATE NOTIFICATIONS
         val notificationTime = sbn.postTime
         if (notificationTime <= BotStateManager.lastNotificationTime) return
         BotStateManager.lastNotificationTime = notificationTime
 
-        // 5. PREVENT READING OUR OWN REPLIES
         val messageKey = "$senderName:$messageText"
         if (BotStateManager.recentlySentMessages.contains(messageKey)) return 
 
-        // 6. COOLDOWN (Prevent spamming)
         val lastReply = BotStateManager.lastReplyTimeMap[senderName] ?: 0L
         if (System.currentTimeMillis() - lastReply < 3000) return
 
@@ -84,9 +72,6 @@ class WhatsAppListenerService : NotificationListenerService() {
             val result = processIncomingMessage(senderName, messageText)
             
             if (result != null && !result.replyText.isNullOrBlank()) {
-                Log.d(TAG, "Bot is replying to $senderName: ${result.replyText}")
-                
-                // 7. APPLY DELAY
                 if (result.delayMax > 0) {
                     val min = result.delayMin
                     val max = result.delayMax
@@ -94,7 +79,6 @@ class WhatsAppListenerService : NotificationListenerService() {
                     delay(randomDelaySeconds * 1000L) 
                 }
 
-                // 8. SEND THE REPLY
                 val remoteInputAction = sbn.notification.actions?.find { action ->
                     action.remoteInputs != null && action.remoteInputs.isNotEmpty()
                 }
@@ -111,14 +95,38 @@ class WhatsAppListenerService : NotificationListenerService() {
                         try {
                             remoteInputAction.actionIntent.send(applicationContext, 0, intent)
                             BotStateManager.recordSentMessage(senderName, result.replyText)
-                            Log.d(TAG, "Reply successfully sent!")
+                            
+                            // Log Success
+                            database.logDao().insertLog(
+                                ActivityLog(
+                                    senderName = senderName,
+                                    incomingMessage = messageText,
+                                    actionTaken = "Replied",
+                                    replyText = result.replyText
+                                )
+                            )
                         } catch (e: Exception) {
-                            Log.e(TAG, "Failed to send reply: ${e.message}")
+                            // Log Error
+                            database.logDao().insertLog(
+                                ActivityLog(
+                                    senderName = senderName,
+                                    incomingMessage = messageText,
+                                    actionTaken = "Error: Failed to send",
+                                    isError = true
+                                )
+                            )
                         }
                     }
-                } else {
-                    Log.e(TAG, "Could not find RemoteInput action in notification.")
                 }
+            } else {
+                // Log No Match
+                database.logDao().insertLog(
+                    ActivityLog(
+                        senderName = senderName,
+                        incomingMessage = messageText,
+                        actionTaken = "No Rule Matched"
+                    )
+                )
             }
         }
     }
@@ -129,7 +137,6 @@ class WhatsAppListenerService : NotificationListenerService() {
         val ruleDao = database.ruleDao()
         val contactDao = database.contactDao()
         
-        // --- LEAD CAPTURE STATE MACHINE ---
         when (BotStateManager.currentLeadState) {
             LeadCaptureState.AWAITING_NAME -> {
                 if (BotStateManager.awaitingNameSender == sender) {
@@ -154,6 +161,16 @@ class WhatsAppListenerService : NotificationListenerService() {
                         )
                         contactDao.insertContact(newContact)
                         
+                        // Log Lead Saved
+                        database.logDao().insertLog(
+                            ActivityLog(
+                                senderName = sender,
+                                incomingMessage = message,
+                                actionTaken = "Lead Saved",
+                                replyText = "Name: ${BotStateManager.tempName}"
+                            )
+                        )
+
                         val successMsg = BotStateManager.activeRule?.successMessage?.replace("{name}", BotStateManager.tempName) ?: "Saved!"
                         
                         val allRules = ruleDao.getAllRulesSync()
@@ -182,10 +199,9 @@ class WhatsAppListenerService : NotificationListenerService() {
                     }
                 }
             }
-            LeadCaptureState.IDLE -> { /* Proceed to normal rules */ }
+            LeadCaptureState.IDLE -> { /* Proceed */ }
         }
 
-        // --- STANDARD RULE MATCHING ---
         val allRules = ruleDao.getAllRulesSync()
         val topLevelRules = allRules.filter { it.parentRuleId == null && it.isActive }
         
@@ -200,7 +216,6 @@ class WhatsAppListenerService : NotificationListenerService() {
             }
             ReplyResult(RuleEngine.getReplyText(matchedRule, number = sender), matchedRule.delayMin, matchedRule.delayMax)
         } else {
-            Log.d(TAG, "No rule matched for this message.")
             null 
         }
     }
