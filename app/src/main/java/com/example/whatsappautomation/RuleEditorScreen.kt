@@ -55,7 +55,6 @@ fun RuleEditorScreen(
     var successMessage by rememberSaveable(existingRule?.id) { mutableStateOf(existingRule?.successMessage ?: "Thank you {name}! Your details have been saved.") }
     var assignTag by rememberSaveable(existingRule?.id) { mutableStateOf(existingRule?.assignTag ?: "") }
     
-    // NEW STATE
     var label by rememberSaveable(existingRule?.id) { mutableStateOf(existingRule?.label ?: "") }
     var targetVersion by rememberSaveable(existingRule?.id) { mutableStateOf(existingRule?.targetVersion ?: "ANY") }
     
@@ -67,7 +66,6 @@ fun RuleEditorScreen(
 
     var expandedCard by rememberSaveable { mutableStateOf("TRIGGER") }
     
-    // MENU STATES
     var showMenu by remember { mutableStateOf(false) }
     var showLabelDialog by remember { mutableStateOf(false) }
     var showVersionsDialog by remember { mutableStateOf(false) }
@@ -99,7 +97,6 @@ fun RuleEditorScreen(
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            // COMPACT TOP BAR
             TopAppBar(
                 title = { 
                     Column {
@@ -187,7 +184,6 @@ fun RuleEditorScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // CARD 1: Received Message
             EditorCard(
                 title = "Received message", 
                 icon = Icons.Default.Message, 
@@ -273,7 +269,6 @@ fun RuleEditorScreen(
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     
-                    // CARD 2: Automatic Reply
                     EditorCard(
                         title = "Automatic reply", 
                         icon = Icons.Default.Reply,
@@ -353,7 +348,6 @@ fun RuleEditorScreen(
                         }
                     }
 
-                    // CARD 3: Save Lead
                     EditorCard(
                         title = "Save lead", 
                         icon = Icons.Default.PersonAdd, 
@@ -385,7 +379,6 @@ fun RuleEditorScreen(
                         }
                     }
 
-                    // CARD 4: Conditions
                     EditorCard(
                         title = "Conditions (optional)", 
                         icon = Icons.Default.Tune,
@@ -421,7 +414,6 @@ fun RuleEditorScreen(
                         }
                     }
 
-                    // CARD 5: Submenu
                     if (existingRule != null) {
                         EditorCard(
                             title = "Submenu / Conversation Flow", 
@@ -462,7 +454,6 @@ fun RuleEditorScreen(
         }
     }
 
-    // --- DIALOGS ---
     if (showLabelDialog) {
         AlertDialog(
             onDismissRequest = { showLabelDialog = false },
