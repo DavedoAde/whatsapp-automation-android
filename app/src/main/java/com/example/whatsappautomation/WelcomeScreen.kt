@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -28,7 +27,6 @@ fun WelcomeScreen(onGetStartedClick: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        // Logo Placeholder (Using an Icon for now, can be replaced with your actual image later)
         Box(
             modifier = Modifier
                 .size(120.dp)
@@ -56,7 +54,7 @@ fun WelcomeScreen(onGetStartedClick: () -> Unit) {
         Spacer(modifier = Modifier.height(16.dp))
 
         Text(
-            text = "WhatsApp Automation is your personal assistant for creating automatic replies and capturing leads.",
+            text = "WAcopilot is your personal assistant for creating automatic replies and capturing leads.",
             fontSize = 16.sp,
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
