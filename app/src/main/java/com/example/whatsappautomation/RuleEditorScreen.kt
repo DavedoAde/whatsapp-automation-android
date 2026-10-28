@@ -63,9 +63,8 @@ fun RuleEditorScreen(
 
     var expandedCard by rememberSaveable { mutableStateOf("TRIGGER") }
 
-    // Logic: If it's a new rule (existingRule == null) and trigger is empty, hide the other cards.
-    // If editing, or if they started typing, show all cards.
-    val showOtherCards = existingRule != null || trigger.isNotBlank()
+    // Logic: If editing, show everything. If new, wait for trigger to be typed OR Welcome message selected.
+    val showOtherCards = existingRule != null || trigger.isNotBlank() || matchType == "WELCOME"
 
     val replies = remember { mutableStateListOf<String>() }
     LaunchedEffect(existingRule) {
@@ -86,7 +85,7 @@ fun RuleEditorScreen(
         else if (replies.isNotEmpty()) replies[replies.size - 1] += " {$varName}"
     }
 
-    val canSave = trigger.isNotBlank() && (askForName || replies.any { it.isNotBlank() })
+    val canSave = (trigger.isNotBlank() || matchType == "WELCOME") && (askForName || replies.any { it.isNotBlank() })
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -106,7 +105,7 @@ fun RuleEditorScreen(
                 onClick = {
                     if (canSave) {
                         val combinedReplies = replies.filter { it.isNotBlank() }.joinToString("|")
-                        val finalName = if (trigger.isBlank()) "Welcome Message" else trigger
+                        val finalName = if (matchType == "WELCOME") "Welcome Message" else if (trigger.isBlank()) "New Rule" else trigger
                         
                         val newRule = existingRule?.copy(
                             name = finalName, triggerKeyword = trigger, replyMessage = combinedReplies,
@@ -131,8 +130,7 @@ fun RuleEditorScreen(
                     }
                 },
                 containerColor = if (canSave) MaterialTheme.colorScheme.primary else Color.Gray,
-                // THIS FIXES THE KEYBOARD OVERLAP!
-                modifier = Modifier.imePadding() 
+                modifier = Modifier.imePadding() // FIX: Floats above keyboard
             ) {
                 Icon(Icons.Default.Check, contentDescription = "Save Rule", tint = Color.White)
             }
@@ -142,11 +140,12 @@ fun RuleEditorScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .imePadding() // FIX: Pushes content up when keyboard opens
                 .verticalScroll(scrollState)
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // CARD 1: Received Message (Always visible)
+            // CARD 1: Received Message
             EditorCard(
                 title = "Received message", 
                 icon = Icons.Default.Message, 
@@ -159,18 +158,28 @@ fun RuleEditorScreen(
                         onValueChange = { trigger = it },
                         label = { Text("Trigger words") },
                         modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(12.dp),
+                        readOnly = matchType == "WELCOME", // Lock if Welcome Message
+                        colors = OutlinedTextFieldDefaults.colors(
+                            disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                            disabledBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f),
+                            disabledLabelColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        )
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Button(
-                        onClick = { trigger = "*"; matchType = "EXACT" }, 
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (trigger == "*") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-                            contentColor = if (trigger == "*") MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    ) {
-                        Text("ALL (*)")
+                    
+                    // Hide the ALL (*) button if Welcome Message is selected
+                    if (matchType != "WELCOME") {
+                        Button(
+                            onClick = { trigger = "*"; matchType = "EXACT" }, 
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (trigger == "*") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                                contentColor = if (trigger == "*") MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        ) {
+                            Text("ALL (*)")
+                        }
                     }
                 }
                 
@@ -193,14 +202,31 @@ fun RuleEditorScreen(
                 
                 Spacer(modifier = Modifier.height(12.dp))
                 
-                MatchOptionRow("Exact match", "Ignores case and punctuation", "EXACT", matchType) { matchType = it }
-                MatchOptionRow("Similarity match", "Triggers if spelling is close (e.g., 'helo')", "SIMILARITY", matchType) { matchType = it }
-                MatchOptionRow("Contains (pattern matching)", "Use * for anything, // for OR", "PATTERN", matchType) { matchType = it }
-                MatchOptionRow("RegEx", "Advanced: use standard Java Regex", "REGEX", matchType) { matchType = it }
-                MatchOptionRow("Welcome message", "Replies to first message from a non-contact", "WELCOME", matchType) { matchType = it }
+                // CLEAN MATCH ROWS
+                MatchOptionRow("Exact match", "EXACT", matchType) { 
+                    matchType = it 
+                    if (it != "WELCOME" && trigger == "%Welcome_message%") trigger = ""
+                }
+                MatchOptionRow("Similarity match", "SIMILARITY", matchType) { 
+                    matchType = it 
+                    if (it != "WELCOME" && trigger == "%Welcome_message%") trigger = ""
+                }
+                MatchOptionRow("Contains (pattern matching)", "PATTERN", matchType) { 
+                    matchType = it 
+                    if (it != "WELCOME" && trigger == "%Welcome_message%") trigger = ""
+                }
+                MatchOptionRow("RegEx", "REGEX", matchType) { 
+                    matchType = it 
+                    if (it != "WELCOME" && trigger == "%Welcome_message%") trigger = ""
+                }
+                MatchOptionRow("Welcome message", "WELCOME", matchType) { 
+                    matchType = it 
+                    if (it == "WELCOME") trigger = "%Welcome_message%" // Auto-fill
+                    else if (trigger == "%Welcome_message%") trigger = "" // Clear if moving away
+                }
             }
 
-            // DYNAMIC APPEARANCE: The rest of the cards only show when the trigger is typed
+            // DYNAMIC APPEARANCE
             AnimatedVisibility(
                 visible = showOtherCards,
                 enter = fadeIn(tween(500)) + expandVertically(tween(500)),
@@ -399,7 +425,7 @@ fun RuleEditorScreen(
 
     LaunchedEffect(showValidationError) {
         if (showValidationError) {
-            snackbarHostState.showSnackbar("Please fill in the trigger and a reply (or turn on Save Lead).")
+            snackbarHostState.showSnackbar("Please fill in a trigger and a reply.")
             showValidationError = false
         }
     }
@@ -444,14 +470,12 @@ fun EditorCard(
     }
 }
 
+// CLEANED UP MATCH ROW (No desc text)
 @Composable
-fun MatchOptionRow(title: String, desc: String, type: String, currentType: String, onSelect: (String) -> Unit) {
+fun MatchOptionRow(title: String, type: String, currentType: String, onSelect: (String) -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { onSelect(type) }) {
         RadioButton(selected = currentType == type, onClick = { onSelect(type) })
-        Column(modifier = Modifier.weight(1f)) {
-            Text(title, fontSize = 14.sp)
-            Text(desc, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
-        }
+        Text(title, fontSize = 14.sp, modifier = Modifier.weight(1f))
         var showDialog by remember { mutableStateOf(false) }
         IconButton(onClick = { showDialog = true }) {
             Icon(Icons.Default.Info, contentDescription = "Info", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
