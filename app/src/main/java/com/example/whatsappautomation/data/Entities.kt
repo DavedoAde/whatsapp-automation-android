@@ -37,15 +37,15 @@ data class AutomationRule(
     val successMessage: String = "Thank you {name}! Your details have been saved.",
     val assignTag: String = "", 
     
-    // Hardware Conditions
+    // NEW FIELDS
+    val label: String = "", 
+    val targetVersion: String = "ANY", // ANY, ORIGINAL, BUSINESS
+    
     val requireScreenOff: Boolean = false,
     val requireCharging: Boolean = false,
     val requireDnd: Boolean = false,
-    
-    // NEW: Time Conditions
     val startTime: String = "",
     val endTime: String = "",
-    
     val parentRuleId: Long? = null 
 )
 
