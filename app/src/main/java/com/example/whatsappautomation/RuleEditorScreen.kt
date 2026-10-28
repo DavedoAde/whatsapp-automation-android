@@ -96,49 +96,7 @@ fun RuleEditorScreen(
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
-        topBar = {
-            TopAppBar(
-                title = { 
-                    Column {
-                        Text(if (existingRule == null) "Create Rule" else "Rule", fontWeight = FontWeight.Bold, fontSize = 20.sp)
-                        if (label.isNotBlank()) {
-                            Text(label, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f))
-                        }
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { showMenu = true }) {
-                        Icon(Icons.Default.MoreVert, contentDescription = "Menu")
-                    }
-                    DropdownMenu(
-                        expanded = showMenu,
-                        onDismissRequest = { showMenu = false }
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text(if (label.isBlank()) "Add label" else "Edit label") },
-                            onClick = { 
-                                showMenu = false
-                                tempLabel = label
-                                showLabelDialog = true 
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Specific versions") },
-                            onClick = { 
-                                showMenu = false
-                                showVersionsDialog = true 
-                            }
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
-            )
-        },
+        // REMOVED TOP BAR HERE - IT IS HANDLED BY MainActivity.kt
         floatingActionButton = {
             FloatingActionButton(
                 onClick = {
@@ -454,6 +412,7 @@ fun RuleEditorScreen(
         }
     }
 
+    // --- DIALOGS ---
     if (showLabelDialog) {
         AlertDialog(
             onDismissRequest = { showLabelDialog = false },
