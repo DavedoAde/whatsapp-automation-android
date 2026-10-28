@@ -112,7 +112,6 @@ fun ContactsScreen(viewModel: AppViewModel) {
         it.name.contains(searchQuery, ignoreCase = true) || it.phoneNumber.contains(searchQuery)
     }
 
-    // FIXED: Removed Scaffold to match RulesScreen spacing exactly
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
             OutlinedTextField(
@@ -399,6 +398,7 @@ fun SettingsScreen() {
     
     var showSaveAccountDialog by remember { mutableStateOf(false) }
     var currentSaveAccount by remember { mutableStateOf(PreferenceManager.getSaveAccount(context)) }
+    var currentGoogleAccount by remember { mutableStateOf(PreferenceManager.getGoogleAccountName(context)) }
     
     val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
     val isBatteryOptimized = !powerManager.isIgnoringBatteryOptimizations(context.packageName)
@@ -506,7 +506,12 @@ fun SettingsScreen() {
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(if (currentSaveAccount == "GOOGLE") "Google Account" else "Phone Memory", fontSize = 16.sp)
+                    Column {
+                        Text(if (currentSaveAccount == "GOOGLE") "Google Account" else "Phone Memory", fontSize = 16.sp)
+                        if (currentSaveAccount == "GOOGLE" && currentGoogleAccount.isNotBlank()) {
+                            Text(currentGoogleAccount, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
+                        }
+                    }
                     Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 }
             }
@@ -542,18 +547,47 @@ fun SettingsScreen() {
 
     // --- SAVE ACCOUNT DIALOG ---
     if (showSaveAccountDialog) {
+        // Fetch all Google Accounts
+        val accounts = remember { 
+            val am = AccountManager.get(context)
+            am.getAccountsByType("com.google").map { it.name } 
+        }
+
         AlertDialog(
             onDismissRequest = { showSaveAccountDialog = false },
             title = { Text("Save Contacts To") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     WaVersionOption("Phone Memory", "LOCAL", currentSaveAccount) { 
-                        currentSaveAccount = it; PreferenceManager.setSaveAccount(context, it); showSaveAccountDialog = false 
+                        currentSaveAccount = "LOCAL"
+                        PreferenceManager.setSaveAccount(context, "LOCAL")
+                        showSaveAccountDialog = false 
                     }
-                    WaVersionOption("Google Account (Email)", "GOOGLE", currentSaveAccount) { 
-                        currentSaveAccount = "GOOGLE"
-                        PreferenceManager.setSaveAccount(context, "GOOGLE")
-                        showSaveAccountDialog = false
+                    
+                    Text("Google Accounts", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), modifier = Modifier.padding(top = 8.dp))
+                    
+                    if (accounts.isEmpty()) {
+                        Text("No Google accounts found on this device.", fontSize = 14.sp, color = MaterialTheme.colorScheme.error)
+                    } else {
+                        accounts.forEach { email ->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth().clickable { 
+                                    currentSaveAccount = "GOOGLE"
+                                    currentGoogleAccount = email
+                                    PreferenceManager.setSaveAccount(context, "GOOGLE")
+                                    PreferenceManager.setGoogleAccountName(context, email)
+                                    showSaveAccountDialog = false 
+                                }.padding(vertical = 8.dp)
+                            ) {
+                                RadioButton(
+                                    selected = currentSaveAccount == "GOOGLE" && currentGoogleAccount == email,
+                                    onClick = null
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(email, fontSize = 16.sp)
+                            }
+                        }
                     }
                 }
             },
