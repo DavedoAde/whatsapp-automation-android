@@ -1,5 +1,6 @@
 package com.example.whatsappautomation
 
+import android.accounts.AccountManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -17,7 +18,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -394,6 +394,10 @@ fun SettingsScreen() {
     var isMultiUser by remember { mutableStateOf(PreferenceManager.isMultiUserEnabled(context)) }
     var isNotificationsEnabled by remember { mutableStateOf(PreferenceManager.isNotificationsEnabled(context)) }
     
+    // New state for Save Account
+    var showSaveAccountDialog by remember { mutableStateOf(false) }
+    var currentSaveAccount by remember { mutableStateOf(PreferenceManager.getSaveAccount(context)) }
+    
     val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
     val isBatteryOptimized = !powerManager.isIgnoringBatteryOptimizations(context.packageName)
 
@@ -421,6 +425,24 @@ fun SettingsScreen() {
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                         fontSize = 14.sp
                     )
+                }
+            }
+        }
+
+        // NEW CARD: Save Contacts To
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("Save Contacts To", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Text("Where should WAcopilot save new leads?", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth().clickable { showSaveAccountDialog = true },
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(if (currentSaveAccount == "GOOGLE") "Google Account" else "Phone Memory", fontSize = 16.sp)
+                    Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 }
             }
         }
@@ -490,6 +512,7 @@ fun SettingsScreen() {
         }
     }
 
+    // --- DIALOGS ---
     if (showWaDialog) {
         AlertDialog(
             onDismissRequest = { showWaDialog = false },
@@ -510,6 +533,30 @@ fun SettingsScreen() {
             confirmButton = {},
             dismissButton = {
                 TextButton(onClick = { showWaDialog = false }) {
+                    Text("CANCEL", color = MaterialTheme.colorScheme.primary)
+                }
+            }
+        )
+    }
+
+    // --- SAVE ACCOUNT DIALOG ---
+    if (showSaveAccountDialog) {
+        AlertDialog(
+            onDismissRequest = { showSaveAccountDialog = false },
+            title = { Text("Save Contacts To") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    WaVersionOption("Phone Memory", "LOCAL", currentSaveAccount) { 
+                        currentSaveAccount = it; PreferenceManager.setSaveAccount(context, it); showSaveAccountDialog = false 
+                    }
+                    WaVersionOption("Google Account (Email)", "GOOGLE", currentSaveAccount) { 
+                        currentSaveAccount = it; PreferenceManager.setSaveAccount(context, it); showSaveAccountDialog = false 
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showSaveAccountDialog = false }) {
                     Text("CANCEL", color = MaterialTheme.colorScheme.primary)
                 }
             }
