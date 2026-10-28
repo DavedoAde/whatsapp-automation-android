@@ -1,37 +1,31 @@
 package com.example.whatsappautomation
 
-import android.accounts.AccountManager
 import android.content.ContentProviderOperation
 import android.content.Context
 import android.provider.ContactsContract
+import android.provider.ContactsContract.RawContacts.DefaultAccount
 import android.util.Log
 
 object PhoneContactManager {
     fun saveContactToPhone(context: Context, name: String, phoneNumber: String): Boolean {
         return try {
             val saveAccount = PreferenceManager.getSaveAccount(context)
+            
             var accountName: String? = null
             var accountType: String? = null
 
+            // If user selected Google, ask the system for the default account
             if (saveAccount == "GOOGLE") {
-                // Check if the user selected a specific email
-                val selectedEmail = PreferenceManager.getGoogleAccountName(context)
+                val defaultAccountAndState = DefaultAccount.getDefaultAccountForNewContacts(context.contentResolver)
                 
-                if (selectedEmail.isNotBlank()) {
-                    accountName = selectedEmail
-                    accountType = "com.google"
-                    Log.d("PhoneContactManager", "Using selected Google Account: $accountName")
+                // Check if the default account is a cloud account (like Google)
+                if (defaultAccountAndState.state == DefaultAccount.DefaultAccountAndState.DEFAULT_ACCOUNT_STATE_CLOUD) {
+                    accountName = defaultAccountAndState.account?.name
+                    accountType = defaultAccountAndState.account?.type
+                    Log.d("PhoneContactManager", "Using system default cloud account: $accountName")
                 } else {
-                    // Fallback: If they didn't select one, grab the first one
-                    val accounts = AccountManager.get(context).getAccountsByType("com.google")
-                    if (accounts.isNotEmpty()) {
-                        accountName = accounts[0].name
-                        accountType = accounts[0].type
-                        Log.d("PhoneContactManager", "Fallback to first Google Account: $accountName")
-                    } else {
-                        Log.e("PhoneContactManager", "No Google Account found.")
-                        return false
-                    }
+                    Log.e("PhoneContactManager", "Default account is not a cloud account. It is local.")
+                    return false
                 }
             }
 
@@ -43,6 +37,10 @@ object PhoneContactManager {
             if (accountName != null && accountType != null) {
                 rawContactInsert.withValue(ContactsContract.RawContacts.ACCOUNT_TYPE, accountType)
                 rawContactInsert.withValue(ContactsContract.RawContacts.ACCOUNT_NAME, accountName)
+            } else {
+                // Default to local phone memory
+                rawContactInsert.withValue(ContactsContract.RawContacts.ACCOUNT_TYPE, null)
+                rawContactInsert.withValue(ContactsContract.RawContacts.ACCOUNT_NAME, null)
             }
             ops.add(rawContactInsert.build())
 
@@ -83,6 +81,7 @@ object PhoneContactManager {
             true
         } catch (e: Exception) {
             Log.e("PhoneContactManager", "Failed to save contact: ${e.message}")
+            e.printStackTrace()
             false
         }
     }
