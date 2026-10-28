@@ -213,20 +213,21 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
         ) {
             Scaffold(
                 topBar = {
-                    // STANDARDIZED GLOBAL TOP BAR
                     if (currentRoute != "welcome" && !isRuleEditor) {
                         TopAppBar(
                             title = { 
+                                // Added 8.dp padding here so the title isn't crammed
                                 Text(
                                     text = when (currentRoute) {
                                         Screen.Dashboard.route -> "Dashboard"
                                         Screen.Rules.route -> "Rules"
                                         Screen.Contacts.route -> "Contacts"
-                                        Screen.Logs.route -> "Logs"
+                                        Screen.Logs.route -> "Reply History"
                                         Screen.Settings.route -> "Settings"
                                         "simulator" -> "Simulator"
                                         else -> ""
                                     },
+                                    modifier = Modifier.padding(start = 8.dp),
                                     color = MaterialTheme.colorScheme.primary, 
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
@@ -271,55 +272,39 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
                                     )
                                 }
 
-                                if (currentRoute == Screen.Rules.route || currentRoute == Screen.Contacts.route) {
-                                    IconButton(onClick = { showGlobalMenu = true }) {
-                                        Icon(Icons.Default.MoreVert, contentDescription = "More", tint = MaterialTheme.colorScheme.primary)
-                                    }
-                                    DropdownMenu(
-                                        expanded = showGlobalMenu,
-                                        onDismissRequest = { showGlobalMenu = false }
-                                    ) {
-                                        if (currentRoute == Screen.Rules.route) {
-                                            DropdownMenuItem(
-                                                text = { Text("Import Rules (JSON)") },
-                                                onClick = { 
-                                                    showGlobalMenu = false
-                                                    importRulesLauncher.launch(arrayOf("application/json"))
-                                                }
-                                            )
-                                            DropdownMenuItem(
-                                                text = { Text("Export All Rules (JSON)") },
-                                                onClick = { 
-                                                    showGlobalMenu = false
-                                                    exportRulesLauncher.launch("WhatsApp_Rules_${System.currentTimeMillis()}.json")
-                                                }
-                                            )
-                                        } else if (currentRoute == Screen.Contacts.route) {
-                                            DropdownMenuItem(
-                                                text = { Text("Export Contacts (CSV)") },
-                                                onClick = { 
-                                                    showGlobalMenu = false
-                                                    viewModel.triggerCsvExport() 
-                                                }
-                                            )
-                                        }
-                                    }
-                                }
-                                
+                                // Logs Screen Refresh Icon
                                 if (currentRoute == Screen.Logs.route) {
-                                    TextButton(onClick = { viewModel.clearLogs() }) {
-                                        Text("Clear", color = MaterialTheme.colorScheme.error)
+                                    IconButton(onClick = { /* Refresh logic implicitly handled by Flow */ }) {
+                                        Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = MaterialTheme.colorScheme.primary)
                                     }
                                 }
 
-                                // DUMMY 3-DOT FOR SETTINGS
-                                if (currentRoute == Screen.Settings.route) {
-                                    IconButton(onClick = { /* Add Settings menu later */ }) {
-                                        Icon(Icons.Default.MoreVert, contentDescription = "More", tint = MaterialTheme.colorScheme.primary)
+                                // Universal 3-Dot Menu
+                                IconButton(onClick = { showGlobalMenu = true }) {
+                                    Icon(Icons.Default.MoreVert, contentDescription = "More", tint = MaterialTheme.colorScheme.primary)
+                                }
+                                DropdownMenu(
+                                    expanded = showGlobalMenu,
+                                    onDismissRequest = { showGlobalMenu = false }
+                                ) {
+                                    if (currentRoute == Screen.Rules.route) {
+                                        DropdownMenuItem(text = { Text("Import Rules (JSON)") }, onClick = { showGlobalMenu = false; importRulesLauncher.launch(arrayOf("application/json")) })
+                                        DropdownMenuItem(text = { Text("Export All Rules (JSON)") }, onClick = { showGlobalMenu = false; exportRulesLauncher.launch("WhatsApp_Rules_${System.currentTimeMillis()}.json") })
+                                    } else if (currentRoute == Screen.Contacts.route) {
+                                        DropdownMenuItem(text = { Text("Export Contacts (CSV)") }, onClick = { showGlobalMenu = false; viewModel.triggerCsvExport() })
+                                    } else if (currentRoute == Screen.Logs.route) {
+                                        DropdownMenuItem(text = { Text("Clear Logs") }, onClick = { showGlobalMenu = false; viewModel.clearLogs() })
+                                    } else if (currentRoute == Screen.Settings.route) {
+                                        DropdownMenuItem(text = { Text("Help & Support") }, onClick = { showGlobalMenu = false })
+                                    } else if (currentRoute == "simulator") {
+                                        DropdownMenuItem(text = { Text("Clear Chat (UI Only)") }, onClick = { showGlobalMenu = false })
+                                    } else if (currentRoute == Screen.Dashboard.route) {
+                                        DropdownMenuItem(text = { Text("Global Settings") }, onClick = { showGlobalMenu = false; navController.navigate(Screen.Settings.route) })
                                     }
                                 }
                             },
-                            colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
+                            // STANDARD COLOR: Matches the bottom navigation bar
+                            colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
                         )
                     }
                 },
