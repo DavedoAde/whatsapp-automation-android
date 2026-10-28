@@ -14,12 +14,24 @@ object PhoneContactManager {
             var accountType: String? = null
 
             if (saveAccount == "GOOGLE") {
-                val accounts = AccountManager.get(context).getAccountsByType("com.google")
-                if (accounts.isNotEmpty()) {
-                    accountName = accounts[0].name
-                    accountType = accounts[0].type
+                // Check if the user selected a specific email
+                val selectedEmail = PreferenceManager.getGoogleAccountName(context)
+                
+                if (selectedEmail.isNotBlank()) {
+                    accountName = selectedEmail
+                    accountType = "com.google"
+                    Log.d("PhoneContactManager", "Using selected Google Account: $accountName")
                 } else {
-                    return false
+                    // Fallback: If they didn't select one, grab the first one
+                    val accounts = AccountManager.get(context).getAccountsByType("com.google")
+                    if (accounts.isNotEmpty()) {
+                        accountName = accounts[0].name
+                        accountType = accounts[0].type
+                        Log.d("PhoneContactManager", "Fallback to first Google Account: $accountName")
+                    } else {
+                        Log.e("PhoneContactManager", "No Google Account found.")
+                        return false
+                    }
                 }
             }
 
@@ -64,9 +76,6 @@ object PhoneContactManager {
                             .withValue(ContactsContract.CommonDataKinds.GroupMembership.GROUP_ROW_ID, groupId)
                             .build()
                     )
-                    Log.d("PhoneContactManager", "Added to My Contacts group ID: $groupId")
-                } else {
-                    Log.e("PhoneContactManager", "Could not find 'My Contacts' group ID.")
                 }
             }
 
@@ -78,12 +87,9 @@ object PhoneContactManager {
         }
     }
 
-    // Fetches the Group ID for "My Contacts" specific to the Google Account
     private fun getMyContactsGroupId(context: Context, accountName: String, accountType: String): Long? {
         val groupUri = ContactsContract.Groups.CONTENT_URI
         val projection = arrayOf(ContactsContract.Groups._ID, ContactsContract.Groups.TITLE)
-        
-        // Find groups for this specific account
         val selection = "${ContactsContract.Groups.ACCOUNT_NAME} = ? AND ${ContactsContract.Groups.ACCOUNT_TYPE} = ?"
         val selectionArgs = arrayOf(accountName, accountType)
 
@@ -93,7 +99,6 @@ object PhoneContactManager {
             
             while (cursor.moveToNext()) {
                 val title = cursor.getString(titleColumn)
-                // The system name for the default Google group is "My Contacts"
                 if (title != null && (title == "My Contacts" || title == "Contacts")) {
                     return cursor.getLong(idColumn)
                 }
