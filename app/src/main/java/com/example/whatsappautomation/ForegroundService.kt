@@ -11,7 +11,7 @@ import androidx.core.app.NotificationCompat
 
 class ForegroundService : Service() {
 
-    private val CHANNEL_ID = "WhatsAppAutomationChannel"
+    private val CHANNEL_ID = "WAcopilotChannel"
 
     override fun onCreate() {
         super.onCreate()
@@ -32,7 +32,7 @@ class ForegroundService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val serviceChannel = NotificationChannel(
                 CHANNEL_ID,
-                "WhatsApp Automation Service",
+                "WAcopilot Service",
                 NotificationManager.IMPORTANCE_LOW
             )
             val manager = getSystemService(NotificationManager::class.java)
@@ -42,7 +42,7 @@ class ForegroundService : Service() {
 
     private fun createNotification(): Notification {
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("WhatsApp Automation is Active")
+            .setContentTitle("WAcopilot is Active")
             .setContentText("Your bot is running in the background.")
             .setSmallIcon(android.R.drawable.stat_notify_chat)
             .setPriority(NotificationCompat.PRIORITY_LOW)
