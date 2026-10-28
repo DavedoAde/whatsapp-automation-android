@@ -211,7 +211,7 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
     ) {
         Scaffold(
             snackbarHost = { SnackbarHost(snackbarHostState) },
-            // FIXED: Tells Scaffold not to add system bar padding to the content, preventing the gap
+            // FIXED: Tells Scaffold not to add system bar padding to the content
             contentWindowInsets = WindowInsets(0, 0, 0, 0),
             topBar = {
                 if (currentRoute != "welcome") {
@@ -225,7 +225,7 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
                                     Screen.Logs.route -> "Reply History"
                                     Screen.Settings.route -> "Settings"
                                     "simulator" -> "Simulator"
-                                    else -> if (existingRuleId == 0L) "Create Rule" else "Edit Rule"
+                                    else -> if (navBackStackEntry?.arguments?.getLong("ruleId") == 0L) "Create Rule" else "Edit Rule"
                                 },
                                 modifier = Modifier.padding(start = 12.dp),
                                 color = MaterialTheme.colorScheme.primary, 
@@ -278,7 +278,7 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
                                 }
                             }
 
-                            // 3-DOT MENU
+                            // Universal 3-Dot Menu
                             IconButton(onClick = { showGlobalMenu = true }) {
                                 Icon(Icons.Default.MoreVert, contentDescription = "More", tint = MaterialTheme.colorScheme.primary)
                             }
@@ -299,6 +299,8 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
                                     DropdownMenuItem(text = { Text("Clear Chat (UI Only)") }, onClick = { showGlobalMenu = false })
                                 } else if (currentRoute == Screen.Dashboard.route) {
                                     DropdownMenuItem(text = { Text("Global Settings") }, onClick = { showGlobalMenu = false; navController.navigate(Screen.Settings.route) })
+                                } else if (isRuleEditor) {
+                                    DropdownMenuItem(text = { Text("Rule Settings") }, onClick = { showGlobalMenu = false })
                                 }
                             }
                         },
