@@ -32,13 +32,19 @@ class WhatsAppListenerService : NotificationListenerService() {
         
         if (!PreferenceManager.isAutomationActive(applicationContext)) return
         
+        // --- WA VERSION CHECK ---
+        val waVersion = PreferenceManager.getWaVersion(applicationContext)
+        val isMultiUser = PreferenceManager.isMultiUserEnabled(applicationContext)
+
         if (packageName == "com.whatsapp") {
-            if (!PreferenceManager.isWaOriginalEnabled(applicationContext)) return
+            if (waVersion == "BUSINESS") return
         } else if (packageName == "com.whatsapp.w4b") {
-            if (!PreferenceManager.isWaBusinessEnabled(applicationContext)) return
+            if (waVersion == "ORIGINAL") return
         } else {
-            return 
+            // If it's a cloned app and Multi-User is OFF, ignore it.
+            if (!isMultiUser) return 
         }
+        // ------------------------
         
         if ((sbn.notification.flags and Notification.FLAG_GROUP_SUMMARY) != 0) return
         if ((sbn.notification.flags and Notification.FLAG_ONGOING_EVENT) != 0) return
@@ -69,7 +75,6 @@ class WhatsAppListenerService : NotificationListenerService() {
         if (System.currentTimeMillis() - lastReply < 3000) return
 
         scope.launch {
-            // Check pause and ignore
             val savedContact = database.contactDao().getContactByName(senderName)
             if (savedContact != null) {
                 if (savedContact.isIgnored) {
@@ -214,7 +219,6 @@ class WhatsAppListenerService : NotificationListenerService() {
         val allRules = ruleDao.getAllRulesSync()
         val topLevelRules = allRules.filter { it.parentRuleId == null && it.isActive }
         
-        // FIXED: Pass applicationContext and enable checkConditions
         val matchedRule = RuleEngine.findMatchingRule(applicationContext, message, topLevelRules, checkConditions = true)
         
         return if (matchedRule != null) {
