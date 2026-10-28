@@ -37,11 +37,9 @@ fun RuleEditorScreen(
     var targetChat by rememberSaveable(existingRule?.id) { mutableStateOf(existingRule?.targetChat ?: "ALL") }
     var replyMode by rememberSaveable(existingRule?.id) { mutableStateOf(existingRule?.replyMode ?: "SINGLE") }
     
-    // Delay State
     var delayMin by rememberSaveable(existingRule?.id) { mutableStateOf(existingRule?.delayMin?.toString() ?: "0") }
     var delayMax by rememberSaveable(existingRule?.id) { mutableStateOf(existingRule?.delayMax?.toString() ?: "0") }
 
-    // Save Lead State
     var askForName by rememberSaveable(existingRule?.id) { mutableStateOf(existingRule?.askForName ?: false) }
     var promptQuestion by rememberSaveable(existingRule?.id) { mutableStateOf(existingRule?.promptQuestion ?: "What's your name?") }
     var confirmQuestion by rememberSaveable(existingRule?.id) { mutableStateOf(existingRule?.confirmQuestion ?: "Is your name {name}? Reply YES or NO.") }
@@ -49,10 +47,14 @@ fun RuleEditorScreen(
     var successMessage by rememberSaveable(existingRule?.id) { mutableStateOf(existingRule?.successMessage ?: "Thank you {name}! Your details have been saved.") }
     var assignTag by rememberSaveable(existingRule?.id) { mutableStateOf(existingRule?.assignTag ?: "") }
     
-    // Conditions
+    // Conditions State
     var screenOff by rememberSaveable(existingRule?.id) { mutableStateOf(existingRule?.requireScreenOff ?: false) }
     var charging by rememberSaveable(existingRule?.id) { mutableStateOf(existingRule?.requireCharging ?: false) }
     var dnd by rememberSaveable(existingRule?.id) { mutableStateOf(existingRule?.requireDnd ?: false) }
+    
+    // NEW: Time State
+    var startTime by rememberSaveable(existingRule?.id) { mutableStateOf(existingRule?.startTime ?: "") }
+    var endTime by rememberSaveable(existingRule?.id) { mutableStateOf(existingRule?.endTime ?: "") }
 
     val replies = remember { mutableStateListOf<String>() }
     LaunchedEffect(existingRule) {
@@ -69,11 +71,8 @@ fun RuleEditorScreen(
     val snackbarHostState = remember { SnackbarHostState() }
 
     fun insertVariable(varName: String, isLeadField: Boolean = false) {
-        if (isLeadField) {
-            successMessage += " {$varName}"
-        } else {
-            if (replies.isNotEmpty()) replies[replies.size - 1] += " {$varName}"
-        }
+        if (isLeadField) successMessage += " {$varName}"
+        else if (replies.isNotEmpty()) replies[replies.size - 1] += " {$varName}"
     }
 
     val canSave = trigger.isNotBlank() && (askForName || replies.any { it.isNotBlank() })
@@ -115,7 +114,9 @@ fun RuleEditorScreen(
                             assignTag = assignTag,
                             requireScreenOff = screenOff,
                             requireCharging = charging,
-                            requireDnd = dnd
+                            requireDnd = dnd,
+                            startTime = startTime,
+                            endTime = endTime
                         ) ?: AutomationRule(
                             name = finalName,
                             triggerKeyword = trigger,
@@ -134,6 +135,8 @@ fun RuleEditorScreen(
                             requireScreenOff = screenOff,
                             requireCharging = charging,
                             requireDnd = dnd,
+                            startTime = startTime,
+                            endTime = endTime,
                             parentRuleId = parentId
                         )
                         onSave(newRule)
@@ -212,7 +215,6 @@ fun RuleEditorScreen(
                 }
                 Spacer(modifier = Modifier.height(8.dp))
                 
-                // DYNAMIC REPLIES LIST
                 replies.forEachIndexed { index, reply ->
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
                         OutlinedTextField(
@@ -247,7 +249,6 @@ fun RuleEditorScreen(
                         Text("Random")
                     }
                     Spacer(modifier = Modifier.weight(1f))
-                    // PROMINENT ADD BUTTON
                     Button(
                         onClick = { replies.add("") }, 
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
@@ -260,7 +261,6 @@ fun RuleEditorScreen(
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
-                // DELAY SECTION
                 Text("Delay in seconds", fontSize = 14.sp, fontWeight = FontWeight.Bold)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
@@ -313,6 +313,30 @@ fun RuleEditorScreen(
                 ConditionSwitchRow("Only reply if screen is off", screenOff) { screenOff = it }
                 ConditionSwitchRow("Only reply if device is charging", charging) { charging = it }
                 ConditionSwitchRow("Only reply if Do Not Disturb is on", dnd) { dnd = it }
+                
+                Spacer(modifier = Modifier.height(12.dp))
+                Text("Time Conditions (Business Hours)", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                Text("Leave blank to reply 24/7", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = startTime,
+                        onValueChange = { if (it.length <= 5) startTime = it },
+                        label = { Text("Start Time") },
+                        placeholder = { Text("09:00") },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    OutlinedTextField(
+                        value = endTime,
+                        onValueChange = { if (it.length <= 5) endTime = it },
+                        label = { Text("End Time") },
+                        placeholder = { Text("17:00") },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                }
             }
 
             // SECTION 6: SUBMENU
