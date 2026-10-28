@@ -39,7 +39,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-// --- DASHBOARD ---
+// --- DASHBOARD, CONTACTS, RULES, LOGS (Keep as they are) ---
 @Composable
 fun DashboardScreen(viewModel: AppViewModel) {
     val activeRulesCount by viewModel.activeRulesCount.collectAsState()
@@ -66,7 +66,6 @@ fun StatCard(title: String, value: String, icon: androidx.compose.ui.graphics.ve
     }
 }
 
-// --- CONTACTS ---
 @Composable
 fun ContactsScreen(viewModel: AppViewModel) {
     val contacts by viewModel.allContacts.collectAsState()
@@ -237,7 +236,6 @@ fun ContactCard(contact: Contact, onPauseClick: () -> Unit, onIgnoreClick: () ->
     }
 }
 
-// --- RULES ---
 @Composable
 fun RulesScreen(viewModel: AppViewModel, onEditRule: (Long) -> Unit) {
     val allRules by viewModel.allRules.collectAsState()
@@ -337,7 +335,6 @@ fun RuleCard(rule: AutomationRule, onToggleClick: () -> Unit, onEditClick: () ->
     }
 }
 
-// --- LOGS ---
 @Composable
 fun LogsScreen(viewModel: AppViewModel) {
     val logs by viewModel.allLogs.collectAsState()
@@ -402,10 +399,9 @@ fun SettingsScreen() {
     val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
     val isBatteryOptimized = !powerManager.isIgnoringBatteryOptimizations(context.packageName)
 
-    // State for the diagnostic tool
     var diagnosticResult by remember { mutableStateOf<PhoneContactManager.SaveResult?>(null) }
+    var diagnosticAccountUsed by remember { mutableStateOf("") }
 
-    // Launcher to ask for GET_ACCOUNTS permission
     val accountsPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
@@ -422,11 +418,11 @@ fun SettingsScreen() {
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         
+        // ... (Version of WA, Multi-User, Notifications, Battery cards remain the same) ...
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text("Version of WA", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                 Spacer(modifier = Modifier.height(8.dp))
-                
                 Row(
                     modifier = Modifier.fillMaxWidth().clickable { showWaDialog = true },
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -534,7 +530,7 @@ fun SettingsScreen() {
 
                 Spacer(modifier = Modifier.height(16.dp))
                 
-                // NEW: Diagnostic Button
+                // Diagnostic Button
                 Button(
                     onClick = {
                         val account = if (currentSaveAccount == "GOOGLE" && currentGoogleAccount.isNotBlank()) {
@@ -542,6 +538,7 @@ fun SettingsScreen() {
                         } else {
                             PhoneContactManager.ContactAccount(null, null)
                         }
+                        diagnosticAccountUsed = account.name ?: "Local Phone Memory"
                         diagnosticResult = PhoneContactManager.saveContactToPhone(context, "WAcopilot Test", "+1234567890", account)
                     },
                     modifier = Modifier.fillMaxWidth()
@@ -629,14 +626,16 @@ fun SettingsScreen() {
     if (diagnosticResult != null) {
         AlertDialog(
             onDismissRequest = { diagnosticResult = null },
-            title = { Text(if (diagnosticResult!!.isSuccess) "Test Successful" else "Test Failed") },
+            title = { Text(if (diagnosticResult!!.isSuccess) "Test Result" else "Test Failed") },
             text = {
-                Text(
-                    if (diagnosticResult!!.isSuccess) 
-                        "The contact was saved successfully to the device's contact database. Please check your phone's Contacts app."
-                    else 
-                        "Error: ${diagnosticResult!!.errorMessage}\n\nThis usually means the app is missing permission or the Google account sync is blocked by the system."
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Target Account: $diagnosticAccountUsed", fontWeight = FontWeight.Bold)
+                    if (diagnosticResult!!.isSuccess) {
+                        Text("The contact was saved successfully to the device's contact database. Please check your phone's Contacts app.")
+                    } else {
+                        Text("Error: ${diagnosticResult!!.errorMessage}\n\nThis usually means the app is missing permission or the Google account sync is blocked by the system.")
+                    }
+                }
             },
             confirmButton = {
                 Button(onClick = { diagnosticResult = null }) {
