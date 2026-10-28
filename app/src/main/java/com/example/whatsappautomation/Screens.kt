@@ -402,6 +402,9 @@ fun SettingsScreen() {
     val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
     val isBatteryOptimized = !powerManager.isIgnoringBatteryOptimizations(context.packageName)
 
+    // State for the diagnostic tool
+    var diagnosticResult by remember { mutableStateOf<PhoneContactManager.SaveResult?>(null) }
+
     // Launcher to ask for GET_ACCOUNTS permission
     val accountsPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
@@ -511,7 +514,6 @@ fun SettingsScreen() {
                 
                 Row(
                     modifier = Modifier.fillMaxWidth().clickable { 
-                        // Request GET_ACCOUNTS if not granted
                         if (ContextCompat.checkSelfPermission(context, Manifest.permission.GET_ACCOUNTS) == PackageManager.PERMISSION_GRANTED) {
                             showSaveAccountDialog = true
                         } else {
@@ -528,6 +530,23 @@ fun SettingsScreen() {
                         }
                     }
                     Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                // NEW: Diagnostic Button
+                Button(
+                    onClick = {
+                        val account = if (currentSaveAccount == "GOOGLE" && currentGoogleAccount.isNotBlank()) {
+                            PhoneContactManager.ContactAccount(currentGoogleAccount, "com.google")
+                        } else {
+                            PhoneContactManager.ContactAccount(null, null)
+                        }
+                        diagnosticResult = PhoneContactManager.saveContactToPhone(context, "WAcopilot Test", "+1234567890", account)
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Run Diagnostic Test")
                 }
             }
         }
@@ -562,7 +581,6 @@ fun SettingsScreen() {
 
     // --- SAVE ACCOUNT DIALOG ---
     if (showSaveAccountDialog) {
-        // Fetch accounts using the updated method in PhoneContactManager
         val accounts = remember { PhoneContactManager.getAccounts(context) }
 
         AlertDialog(
@@ -602,6 +620,27 @@ fun SettingsScreen() {
             dismissButton = {
                 TextButton(onClick = { showSaveAccountDialog = false }) {
                     Text("CANCEL", color = MaterialTheme.colorScheme.primary)
+                }
+            }
+        )
+    }
+
+    // --- DIAGNOSTIC RESULT DIALOG ---
+    if (diagnosticResult != null) {
+        AlertDialog(
+            onDismissRequest = { diagnosticResult = null },
+            title = { Text(if (diagnosticResult!!.isSuccess) "Test Successful" else "Test Failed") },
+            text = {
+                Text(
+                    if (diagnosticResult!!.isSuccess) 
+                        "The contact was saved successfully to the device's contact database. Please check your phone's Contacts app."
+                    else 
+                        "Error: ${diagnosticResult!!.errorMessage}\n\nThis usually means the app is missing permission or the Google account sync is blocked by the system."
+                )
+            },
+            confirmButton = {
+                Button(onClick = { diagnosticResult = null }) {
+                    Text("OK")
                 }
             }
         )
