@@ -402,17 +402,12 @@ fun SettingsScreen() {
     val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
     val isBatteryOptimized = !powerManager.isIgnoringBatteryOptimizations(context.packageName)
 
-    // FIXED: Ask for READ_CONTACTS and WRITE_CONTACTS instead of GET_ACCOUNTS
-    val permLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestMultiplePermissions()
-    ) { permissions ->
-        val readGranted = permissions[Manifest.permission.READ_CONTACTS] == true
-        val writeGranted = permissions[Manifest.permission.WRITE_CONTACTS] == true
-        
-        if (readGranted && writeGranted) {
+    // Launcher to ask for GET_ACCOUNTS permission
+    val accountsPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
             showSaveAccountDialog = true
-        } else {
-            // Optional: Show a message if they deny
         }
     }
 
@@ -516,14 +511,11 @@ fun SettingsScreen() {
                 
                 Row(
                     modifier = Modifier.fillMaxWidth().clickable { 
-                        // FIXED: Check for READ_CONTACTS and WRITE_CONTACTS, not GET_ACCOUNTS
-                        val hasRead = ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED
-                        val hasWrite = ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_CONTACTS) == PackageManager.PERMISSION_GRANTED
-                        
-                        if (hasRead && hasWrite) {
+                        // Request GET_ACCOUNTS if not granted
+                        if (ContextCompat.checkSelfPermission(context, Manifest.permission.GET_ACCOUNTS) == PackageManager.PERMISSION_GRANTED) {
                             showSaveAccountDialog = true
                         } else {
-                            permLauncher.launch(arrayOf(Manifest.permission.READ_CONTACTS, Manifest.permission.WRITE_CONTACTS))
+                            accountsPermissionLauncher.launch(Manifest.permission.GET_ACCOUNTS)
                         }
                     },
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -570,6 +562,7 @@ fun SettingsScreen() {
 
     // --- SAVE ACCOUNT DIALOG ---
     if (showSaveAccountDialog) {
+        // Fetch accounts using the updated method in PhoneContactManager
         val accounts = remember { PhoneContactManager.getAccounts(context) }
 
         AlertDialog(
