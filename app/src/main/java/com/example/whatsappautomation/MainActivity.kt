@@ -13,10 +13,9 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.core.FastOutSlowInEasing // ADDED
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
@@ -236,7 +235,20 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
             NavHost(
                 navController = navController,
                 startDestination = startDestination,
-                modifier = Modifier.padding(innerPadding)
+                modifier = Modifier.padding(innerPadding),
+                // GLOBAL ANIMATIONS: Apply to all screens in the NavHost
+                enterTransition = { 
+                    slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(400, easing = FastOutSlowInEasing)) 
+                },
+                exitTransition = { 
+                    slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(400, easing = FastOutSlowInEasing)) 
+                },
+                popEnterTransition = { 
+                    slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(400, easing = FastOutSlowInEasing)) 
+                },
+                popExitTransition = { 
+                    slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(400, easing = FastOutSlowInEasing)) 
+                }
             ) {
                 composable("welcome") {
                     WelcomeScreen(onGetStartedClick = {
@@ -248,28 +260,8 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
                 composable(Screen.Dashboard.route) { DashboardScreen(viewModel) }
                 composable(Screen.Rules.route) { RulesScreen(viewModel, onEditRule = { ruleId -> navController.navigate("rule_editor/$ruleId/0") }) }
                 composable(Screen.Contacts.route) { ContactsScreen(viewModel) }
-                
-                // FIXED: Smooth 500ms animations with Easing curve
-                composable(
-                    route = Screen.Logs.route,
-                    enterTransition = { slideInHorizontally(initialOffsetX = { -it }, animationSpec = tween(500, easing = FastOutSlowInEasing)) },
-                    exitTransition = { slideOutHorizontally(targetOffsetX = { -it }, animationSpec = tween(500, easing = FastOutSlowInEasing)) },
-                    popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }, animationSpec = tween(500, easing = FastOutSlowInEasing)) },
-                    popExitTransition = { slideOutHorizontally(targetOffsetX = { it }, animationSpec = tween(500, easing = FastOutSlowInEasing)) }
-                ) { 
-                    LogsScreen(viewModel, onBack = { navController.popBackStack() }) 
-                }
-                
-                composable(
-                    route = Screen.Settings.route,
-                    enterTransition = { slideInHorizontally(initialOffsetX = { -it }, animationSpec = tween(500, easing = FastOutSlowInEasing)) },
-                    exitTransition = { slideOutHorizontally(targetOffsetX = { -it }, animationSpec = tween(500, easing = FastOutSlowInEasing)) },
-                    popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }, animationSpec = tween(500, easing = FastOutSlowInEasing)) },
-                    popExitTransition = { slideOutHorizontally(targetOffsetX = { it }, animationSpec = tween(500, easing = FastOutSlowInEasing)) }
-                ) { 
-                    SettingsScreen(onBack = { navController.popBackStack() }) 
-                }
-                
+                composable(Screen.Logs.route) { LogsScreen(viewModel, onBack = { navController.popBackStack() }) }
+                composable(Screen.Settings.route) { SettingsScreen(onBack = { navController.popBackStack() }) }
                 composable("simulator") { SimulatorScreen(viewModel, onBack = { navController.popBackStack() }) }
 
                 composable(
