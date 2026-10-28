@@ -18,6 +18,7 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -28,7 +29,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
@@ -134,7 +134,6 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
         }
     }
 
-    // --- MENU STATES FOR MAIN TOP BAR ---
     var showGlobalMenu by remember { mutableStateOf(false) }
 
     ModalNavigationDrawer(
@@ -176,45 +175,68 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
     ) {
         Scaffold(
             topBar = {
-                if (isMainScreen) {
-                    // COMPACT MAIN TOP BAR
+                if (currentRoute != "welcome") {
+                    // GLOBAL COMPACT TOP BAR
                     TopAppBar(
-                        title = { Text("WhatsApp Automation", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleMedium) },
+                        title = { 
+                            Text(
+                                text = when (currentRoute) {
+                                    Screen.Dashboard.route -> "Dashboard"
+                                    Screen.Rules.route -> "Rules"
+                                    Screen.Contacts.route -> "Contacts"
+                                    Screen.Logs.route -> "Logs"
+                                    Screen.Settings.route -> "Settings"
+                                    "simulator" -> "Simulator"
+                                    else -> "Rule Editor" // For nested rule editor routes
+                                },
+                                color = MaterialTheme.colorScheme.primary, 
+                                style = MaterialTheme.typography.titleMedium
+                            ) 
+                        },
                         navigationIcon = {
-                            IconButton(onClick = { scope.launch { drawerState.open() } }) {
-                                Icon(Icons.Default.Menu, contentDescription = "Menu", tint = MaterialTheme.colorScheme.primary)
+                            if (isMainScreen) {
+                                IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                                    Icon(Icons.Default.Menu, contentDescription = "Menu", tint = MaterialTheme.colorScheme.primary)
+                                }
+                            } else {
+                                IconButton(onClick = { navController.popBackStack() }) {
+                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.primary)
+                                }
                             }
                         },
                         actions = {
-                            IconButton(onClick = { navController.navigate("simulator") }) {
-                                Icon(imageVector = Icons.AutoMirrored.Filled.Chat, contentDescription = "Simulator", tint = MaterialTheme.colorScheme.primary)
-                            }
-                            
-                            Switch(
-                                checked = isAutomationActive,
-                                onCheckedChange = { isChecked ->
-                                    if (isChecked) {
-                                        if (hasNotifAccess && hasContactAccess) {
-                                            viewModel.toggleAutomation(true)
-                                            val isOptimized = !powerManager.isIgnoringBatteryOptimizations(context.packageName)
-                                            if (isOptimized && !PreferenceManager.isBatteryIgnored(context)) { showBatteryDialog = true }
+                            // Show Simulator & Switch ONLY on Main Screens
+                            if (isMainScreen) {
+                                IconButton(onClick = { navController.navigate("simulator") }) {
+                                    Icon(imageVector = Icons.AutoMirrored.Filled.Chat, contentDescription = "Simulator", tint = MaterialTheme.colorScheme.primary)
+                                }
+                                
+                                Switch(
+                                    checked = isAutomationActive,
+                                    onCheckedChange = { isChecked ->
+                                        if (isChecked) {
+                                            if (hasNotifAccess && hasContactAccess) {
+                                                viewModel.toggleAutomation(true)
+                                                val isOptimized = !powerManager.isIgnoringBatteryOptimizations(context.packageName)
+                                                if (isOptimized && !PreferenceManager.isBatteryIgnored(context)) { showBatteryDialog = true }
+                                            } else {
+                                                isTurningOnAutomation = true
+                                                showPermissionDialog = true
+                                            }
                                         } else {
-                                            isTurningOnAutomation = true
-                                            showPermissionDialog = true
+                                            viewModel.toggleAutomation(false)
+                                            isTurningOnAutomation = false
                                         }
-                                    } else {
-                                        viewModel.toggleAutomation(false)
-                                        isTurningOnAutomation = false
-                                    }
-                                },
-                                modifier = Modifier.padding(end = 8.dp),
-                                colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary, checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
-                            )
+                                    },
+                                    modifier = Modifier.padding(end = 8.dp),
+                                    colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary, checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
+                                )
+                            }
 
-                            // DYNAMIC 3-DOT MENU (Rules & Contacts)
+                            // Global Menu for Rules and Contacts
                             if (currentRoute == Screen.Rules.route || currentRoute == Screen.Contacts.route) {
                                 IconButton(onClick = { showGlobalMenu = true }) {
-                                    Icon(Icons.Default.MoreVert, contentDescription = "More")
+                                    Icon(Icons.Default.MoreVert, contentDescription = "More", tint = MaterialTheme.colorScheme.primary)
                                 }
                                 DropdownMenu(
                                     expanded = showGlobalMenu,
@@ -234,11 +256,17 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
                                             text = { Text("Export Contacts (CSV)") },
                                             onClick = { 
                                                 showGlobalMenu = false
-                                                // This will trigger the export logic inside ContactsScreen
                                                 viewModel.triggerCsvExport() 
                                             }
                                         )
                                     }
+                                }
+                            }
+                            
+                            // Logs clear action
+                            if (currentRoute == Screen.Logs.route) {
+                                TextButton(onClick = { viewModel.clearLogs() }) {
+                                    Text("Clear", color = MaterialTheme.colorScheme.error)
                                 }
                             }
                         },
@@ -287,8 +315,8 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
                 composable(Screen.Dashboard.route) { DashboardScreen(viewModel) }
                 composable(Screen.Rules.route) { RulesScreen(viewModel, onEditRule = { ruleId -> navController.navigate("rule_editor/$ruleId/0") }) }
                 composable(Screen.Contacts.route) { ContactsScreen(viewModel) }
-                composable(Screen.Logs.route) { LogsScreen(viewModel, onBack = { navController.popBackStack() }) }
-                composable(Screen.Settings.route) { SettingsScreen(onBack = { navController.popBackStack() }) }
+                composable(Screen.Logs.route) { LogsScreen(viewModel) }
+                composable(Screen.Settings.route) { SettingsScreen() }
                 composable("simulator") { SimulatorScreen(viewModel, onBack = { navController.popBackStack() }) }
 
                 composable(
