@@ -1,8 +1,10 @@
 package com.example.whatsappautomation
 
+import android.Manifest
 import android.accounts.AccountManager
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.PowerManager
 import android.provider.Settings
@@ -29,6 +31,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import com.example.whatsappautomation.data.ActivityLog
 import com.example.whatsappautomation.data.AutomationRule
 import com.example.whatsappautomation.data.Contact
@@ -112,7 +115,8 @@ fun ContactsScreen(viewModel: AppViewModel) {
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
-        Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
+        // FIXED: Reduced vertical padding to remove the weird gap
+        Column(modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp, vertical = 8.dp)) {
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
@@ -122,7 +126,7 @@ fun ContactsScreen(viewModel: AppViewModel) {
                 shape = RoundedCornerShape(12.dp)
             )
             
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             if (filteredContacts.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -394,9 +398,19 @@ fun SettingsScreen() {
     var isMultiUser by remember { mutableStateOf(PreferenceManager.isMultiUserEnabled(context)) }
     var isNotificationsEnabled by remember { mutableStateOf(PreferenceManager.isNotificationsEnabled(context)) }
     
-    // New state for Save Account
     var showSaveAccountDialog by remember { mutableStateOf(false) }
     var currentSaveAccount by remember { mutableStateOf(PreferenceManager.getSaveAccount(context)) }
+    
+    // FIXED: Add Runtime Permission Request for GET_ACCOUNTS
+    val getAccountsPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            currentSaveAccount = "GOOGLE"
+            PreferenceManager.setSaveAccount(context, "GOOGLE")
+        }
+        showSaveAccountDialog = false
+    }
     
     val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
     val isBatteryOptimized = !powerManager.isIgnoringBatteryOptimizations(context.packageName)
@@ -425,24 +439,6 @@ fun SettingsScreen() {
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                         fontSize = 14.sp
                     )
-                }
-            }
-        }
-
-        // NEW CARD: Save Contacts To
-        Card(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text("Save Contacts To", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                Text("Where should WAcopilot save new leads?", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                Row(
-                    modifier = Modifier.fillMaxWidth().clickable { showSaveAccountDialog = true },
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(if (currentSaveAccount == "GOOGLE") "Google Account" else "Phone Memory", fontSize = 16.sp)
-                    Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 }
             }
         }
@@ -481,6 +477,7 @@ fun SettingsScreen() {
             }
         }
 
+        // FIXED: Moved Save Contacts To down below Battery Optimization
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text("Battery Optimization", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
@@ -507,6 +504,23 @@ fun SettingsScreen() {
                     ) {
                         Text("Disable Optimization")
                     }
+                }
+            }
+        }
+
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("Save Contacts To", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Text("Where should WAcopilot save new leads?", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth().clickable { showSaveAccountDialog = true },
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(if (currentSaveAccount == "GOOGLE") "Google Account" else "Phone Memory", fontSize = 16.sp)
+                    Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 }
             }
         }
@@ -550,7 +564,14 @@ fun SettingsScreen() {
                         currentSaveAccount = it; PreferenceManager.setSaveAccount(context, it); showSaveAccountDialog = false 
                     }
                     WaVersionOption("Google Account (Email)", "GOOGLE", currentSaveAccount) { 
-                        currentSaveAccount = it; PreferenceManager.setSaveAccount(context, it); showSaveAccountDialog = false 
+                        // Request permission instead of setting directly
+                        if (ContextCompat.checkSelfPermission(context, Manifest.permission.GET_ACCOUNTS) == PackageManager.PERMISSION_GRANTED) {
+                            currentSaveAccount = "GOOGLE"
+                            PreferenceManager.setSaveAccount(context, "GOOGLE")
+                            showSaveAccountDialog = false
+                        } else {
+                            getAccountsPermissionLauncher.launch(Manifest.permission.GET_ACCOUNTS)
+                        }
                     }
                 }
             },
