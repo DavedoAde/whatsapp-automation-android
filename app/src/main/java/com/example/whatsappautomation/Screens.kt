@@ -112,11 +112,9 @@ fun ContactsScreen(viewModel: AppViewModel) {
         it.name.contains(searchQuery, ignoreCase = true) || it.phoneNumber.contains(searchQuery)
     }
 
-    Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) }
-    ) { padding ->
-        // FIXED: Reduced vertical padding to remove the weird gap
-        Column(modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp, vertical = 8.dp)) {
+    // FIXED: Removed Scaffold to match RulesScreen spacing exactly
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
@@ -126,7 +124,7 @@ fun ContactsScreen(viewModel: AppViewModel) {
                 shape = RoundedCornerShape(12.dp)
             )
             
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
             if (filteredContacts.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -144,6 +142,7 @@ fun ContactsScreen(viewModel: AppViewModel) {
                 }
             }
         }
+        SnackbarHost(hostState = snackbarHostState, modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp))
     }
 
     if (showPauseMenuForContact != null) {
@@ -401,17 +400,6 @@ fun SettingsScreen() {
     var showSaveAccountDialog by remember { mutableStateOf(false) }
     var currentSaveAccount by remember { mutableStateOf(PreferenceManager.getSaveAccount(context)) }
     
-    // FIXED: Add Runtime Permission Request for GET_ACCOUNTS
-    val getAccountsPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        if (isGranted) {
-            currentSaveAccount = "GOOGLE"
-            PreferenceManager.setSaveAccount(context, "GOOGLE")
-        }
-        showSaveAccountDialog = false
-    }
-    
     val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
     val isBatteryOptimized = !powerManager.isIgnoringBatteryOptimizations(context.packageName)
 
@@ -477,7 +465,6 @@ fun SettingsScreen() {
             }
         }
 
-        // FIXED: Moved Save Contacts To down below Battery Optimization
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text("Battery Optimization", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
@@ -564,14 +551,10 @@ fun SettingsScreen() {
                         currentSaveAccount = it; PreferenceManager.setSaveAccount(context, it); showSaveAccountDialog = false 
                     }
                     WaVersionOption("Google Account (Email)", "GOOGLE", currentSaveAccount) { 
-                        // Request permission instead of setting directly
-                        if (ContextCompat.checkSelfPermission(context, Manifest.permission.GET_ACCOUNTS) == PackageManager.PERMISSION_GRANTED) {
-                            currentSaveAccount = "GOOGLE"
-                            PreferenceManager.setSaveAccount(context, "GOOGLE")
-                            showSaveAccountDialog = false
-                        } else {
-                            getAccountsPermissionLauncher.launch(Manifest.permission.GET_ACCOUNTS)
-                        }
+                        // FIXED: Removed the problematic runtime permission request. It just sets it now.
+                        currentSaveAccount = "GOOGLE"
+                        PreferenceManager.setSaveAccount(context, "GOOGLE")
+                        showSaveAccountDialog = false
                     }
                 }
             },
