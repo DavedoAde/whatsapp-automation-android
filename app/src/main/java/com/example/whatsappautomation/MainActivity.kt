@@ -13,6 +13,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
@@ -58,13 +60,11 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
     val lifecycleOwner = LocalLifecycleOwner.current
     val navController = rememberNavController()
     
-    // --- DRAWER STATE ---
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     
     val startDestination = if (PreferenceManager.isFirstLaunch(context)) "welcome" else Screen.Dashboard.route
 
-    // Bottom Bar Screens (Reduced to 3)
     val bottomScreens = listOf(
         Screen.Dashboard, 
         Screen.Rules,
@@ -74,17 +74,15 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
     
+    // FIXED: Only show top/bottom bars on main screens
     val isMainScreen = currentRoute in listOf(
         Screen.Dashboard.route, 
         Screen.Contacts.route, 
-        Screen.Rules.route,
-        Screen.Logs.route,
-        Screen.Settings.route
+        Screen.Rules.route
     )
 
     val isAutomationActive by viewModel.isAutomationActive.collectAsState()
     
-    // --- PERMISSIONS & BATTERY STATE ---
     var hasNotifAccess by remember { mutableStateOf(checkNotificationAccess(context)) }
     var hasContactAccess by remember { mutableStateOf(checkContactAccess(context)) }
     var showPermissionDialog by remember { mutableStateOf(false) }
@@ -136,27 +134,20 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
         }
     }
 
-    // --- MAIN SCAFFOLD WRAPPED IN DRAWER ---
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
             ModalDrawerSheet(
+                modifier = Modifier.fillMaxWidth(0.66f), // FIXED: 2/3 of the screen
                 drawerContainerColor = MaterialTheme.colorScheme.surface,
                 drawerShape = MaterialTheme.shapes.large
             ) {
-                // Drawer Header
                 Column(modifier = Modifier.padding(24.dp)) {
-                    Text(
-                        text = "WhatsApp Automation",
-                        fontSize = 20.sp,
-                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
+                    Text("WhatsApp Automation", fontSize = 20.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                     Text("Version 1.0", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
                 }
                 Divider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f), modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
                 
-                // Drawer Items
                 NavigationDrawerItem(
                     icon = { Icon(Icons.Default.History, contentDescription = null) },
                     label = { Text("Logs (Reply History)") },
@@ -186,20 +177,14 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
                     TopAppBar(
                         title = { Text("WhatsApp Automation", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleLarge) },
                         navigationIcon = {
-                            // Hamburger Icon
                             IconButton(onClick = { scope.launch { drawerState.open() } }) {
                                 Icon(Icons.Default.Menu, contentDescription = "Menu", tint = MaterialTheme.colorScheme.primary)
                             }
                         },
                         actions = {
                             IconButton(onClick = { navController.navigate("simulator") }) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.Chat, 
-                                    contentDescription = "Simulator",
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
+                                Icon(imageVector = Icons.AutoMirrored.Filled.Chat, contentDescription = "Simulator", tint = MaterialTheme.colorScheme.primary)
                             }
-                            
                             Switch(
                                 checked = isAutomationActive,
                                 onCheckedChange = { isChecked ->
@@ -207,9 +192,7 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
                                         if (hasNotifAccess && hasContactAccess) {
                                             viewModel.toggleAutomation(true)
                                             val isOptimized = !powerManager.isIgnoringBatteryOptimizations(context.packageName)
-                                            if (isOptimized && !PreferenceManager.isBatteryIgnored(context)) {
-                                                showBatteryDialog = true
-                                            }
+                                            if (isOptimized && !PreferenceManager.isBatteryIgnored(context)) { showBatteryDialog = true }
                                         } else {
                                             isTurningOnAutomation = true
                                             showPermissionDialog = true
@@ -220,10 +203,7 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
                                     }
                                 },
                                 modifier = Modifier.padding(end = 16.dp),
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = MaterialTheme.colorScheme.primary,
-                                    checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
-                                )
+                                colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary, checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
                             )
                         },
                         colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
@@ -238,11 +218,7 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
                                 icon = { Icon(screen.icon, contentDescription = screen.title) },
                                 label = { Text(screen.title) },
                                 selected = currentRoute == screen.route,
-                                colors = NavigationBarItemDefaults.colors(
-                                    selectedIconColor = MaterialTheme.colorScheme.primary,
-                                    selectedTextColor = MaterialTheme.colorScheme.primary,
-                                    indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
-                                ),
+                                colors = NavigationBarItemDefaults.colors(selectedIconColor = MaterialTheme.colorScheme.primary, selectedTextColor = MaterialTheme.colorScheme.primary, indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
                                 onClick = {
                                     navController.navigate(screen.route) {
                                         popUpTo(navController.graph.startDestinationId) { saveState = true }
@@ -262,52 +238,50 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
                 modifier = Modifier.padding(innerPadding)
             ) {
                 composable("welcome") {
-                    WelcomeScreen(
-                        onGetStartedClick = {
-                            PreferenceManager.setFirstLaunchCompleted(context)
-                            navController.navigate(Screen.Dashboard.route) {
-                                popUpTo("welcome") { inclusive = true }
-                            }
-                        }
-                    )
+                    WelcomeScreen(onGetStartedClick = {
+                        PreferenceManager.setFirstLaunchCompleted(context)
+                        navController.navigate(Screen.Dashboard.route) { popUpTo("welcome") { inclusive = true } }
+                    })
                 }
                 
                 composable(Screen.Dashboard.route) { DashboardScreen(viewModel) }
                 composable(Screen.Rules.route) { RulesScreen(viewModel, onEditRule = { ruleId -> navController.navigate("rule_editor/$ruleId/0") }) }
                 composable(Screen.Contacts.route) { ContactsScreen(viewModel) }
-                composable(Screen.Logs.route) { LogsScreen(viewModel) }
-                composable(Screen.Settings.route) { SettingsScreen() }
+                
+                // FIXED: Added slide transitions for Logs and Settings
+                composable(
+                    route = Screen.Logs.route,
+                    enterTransition = { slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(300)) },
+                    exitTransition = { slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(300)) }
+                ) { 
+                    LogsScreen(viewModel, onBack = { navController.popBackStack() }) 
+                }
+                
+                composable(
+                    route = Screen.Settings.route,
+                    enterTransition = { slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(300)) },
+                    exitTransition = { slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(300)) }
+                ) { 
+                    SettingsScreen(onBack = { navController.popBackStack() }) 
+                }
                 
                 composable("simulator") { SimulatorScreen(viewModel, onBack = { navController.popBackStack() }) }
 
                 composable(
                     route = "rule_editor/{ruleId}/{parentId}",
-                    arguments = listOf(
-                        navArgument("ruleId") { type = NavType.LongType },
-                        navArgument("parentId") { type = NavType.LongType }
-                    )
+                    arguments = listOf(navArgument("ruleId") { type = NavType.LongType }, navArgument("parentId") { type = NavType.LongType })
                 ) { backStackEntry ->
                     val ruleId = backStackEntry.arguments?.getLong("ruleId") ?: 0L
                     val parentId = backStackEntry.arguments?.getLong("parentId") ?: 0L
-                    
                     val existingRule = if (ruleId == 0L) null else viewModel.allRules.value.find { it.id == ruleId }
                     val childRules = viewModel.allRules.value.filter { it.parentRuleId == ruleId }
                     
                     RuleEditorScreen(
-                        existingRule = existingRule,
-                        parentId = if (parentId == 0L) null else parentId,
-                        childRules = childRules,
+                        existingRule = existingRule, parentId = if (parentId == 0L) null else parentId, childRules = childRules,
                         onBack = { navController.popBackStack() },
-                        onSave = { updatedRule ->
-                            viewModel.saveRule(updatedRule)
-                            navController.popBackStack()
-                        },
-                        onAddChildRule = { parentRuleId ->
-                            navController.navigate("rule_editor/0/$parentRuleId")
-                        },
-                        onEditChildRule = { childId ->
-                            navController.navigate("rule_editor/$childId/0") 
-                        }
+                        onSave = { updatedRule -> viewModel.saveRule(updatedRule); navController.popBackStack() },
+                        onAddChildRule = { parentRuleId -> navController.navigate("rule_editor/0/$parentRuleId") },
+                        onEditChildRule = { childId -> navController.navigate("rule_editor/$childId/0") }
                     )
                 }
             }
@@ -377,9 +351,7 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
                     }
                 ) { Text("Go to Settings") }
             },
-            dismissButton = {
-                TextButton(onClick = { PreferenceManager.setBatteryIgnored(context, true); showBatteryDialog = false }) { Text("Ignore", color = Color.Gray) }
-            }
+            dismissButton = { TextButton(onClick = { PreferenceManager.setBatteryIgnored(context, true); showBatteryDialog = false }) { Text("Ignore", color = Color.Gray) } }
         )
     }
 }
