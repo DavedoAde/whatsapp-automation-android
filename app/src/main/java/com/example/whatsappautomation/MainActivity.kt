@@ -134,6 +134,9 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
         }
     }
 
+    // --- MENU STATES FOR MAIN TOP BAR ---
+    var showGlobalMenu by remember { mutableStateOf(false) }
+
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
@@ -174,8 +177,9 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
         Scaffold(
             topBar = {
                 if (isMainScreen) {
+                    // COMPACT MAIN TOP BAR
                     TopAppBar(
-                        title = { Text("WhatsApp Automation", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleLarge) },
+                        title = { Text("WhatsApp Automation", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleMedium) },
                         navigationIcon = {
                             IconButton(onClick = { scope.launch { drawerState.open() } }) {
                                 Icon(Icons.Default.Menu, contentDescription = "Menu", tint = MaterialTheme.colorScheme.primary)
@@ -185,6 +189,7 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
                             IconButton(onClick = { navController.navigate("simulator") }) {
                                 Icon(imageVector = Icons.AutoMirrored.Filled.Chat, contentDescription = "Simulator", tint = MaterialTheme.colorScheme.primary)
                             }
+                            
                             Switch(
                                 checked = isAutomationActive,
                                 onCheckedChange = { isChecked ->
@@ -202,9 +207,40 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
                                         isTurningOnAutomation = false
                                     }
                                 },
-                                modifier = Modifier.padding(end = 16.dp),
+                                modifier = Modifier.padding(end = 8.dp),
                                 colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary, checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
                             )
+
+                            // DYNAMIC 3-DOT MENU (Rules & Contacts)
+                            if (currentRoute == Screen.Rules.route || currentRoute == Screen.Contacts.route) {
+                                IconButton(onClick = { showGlobalMenu = true }) {
+                                    Icon(Icons.Default.MoreVert, contentDescription = "More")
+                                }
+                                DropdownMenu(
+                                    expanded = showGlobalMenu,
+                                    onDismissRequest = { showGlobalMenu = false }
+                                ) {
+                                    if (currentRoute == Screen.Rules.route) {
+                                        DropdownMenuItem(
+                                            text = { Text("Import Rules") },
+                                            onClick = { showGlobalMenu = false /* Implement Import */ }
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text("Export All Rules") },
+                                            onClick = { showGlobalMenu = false /* Implement Export */ }
+                                        )
+                                    } else if (currentRoute == Screen.Contacts.route) {
+                                        DropdownMenuItem(
+                                            text = { Text("Export Contacts (CSV)") },
+                                            onClick = { 
+                                                showGlobalMenu = false
+                                                // This will trigger the export logic inside ContactsScreen
+                                                viewModel.triggerCsvExport() 
+                                            }
+                                        )
+                                    }
+                                }
+                            }
                         },
                         colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
                     )
@@ -236,19 +272,10 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
                 navController = navController,
                 startDestination = startDestination,
                 modifier = Modifier.padding(innerPadding),
-                // GLOBAL ANIMATIONS: Apply to all screens in the NavHost
-                enterTransition = { 
-                    slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(400, easing = FastOutSlowInEasing)) 
-                },
-                exitTransition = { 
-                    slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(400, easing = FastOutSlowInEasing)) 
-                },
-                popEnterTransition = { 
-                    slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(400, easing = FastOutSlowInEasing)) 
-                },
-                popExitTransition = { 
-                    slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(400, easing = FastOutSlowInEasing)) 
-                }
+                enterTransition = { slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(400, easing = FastOutSlowInEasing)) },
+                exitTransition = { slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(400, easing = FastOutSlowInEasing)) },
+                popEnterTransition = { slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(400, easing = FastOutSlowInEasing)) },
+                popExitTransition = { slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(400, easing = FastOutSlowInEasing)) }
             ) {
                 composable("welcome") {
                     WelcomeScreen(onGetStartedClick = {
