@@ -1,33 +1,48 @@
 package com.example.whatsappautomation
 
+import android.content.Context
 import com.example.whatsappautomation.data.AutomationRule
 
 object RuleEngine {
     
-    fun findMatchingRule(message: String, rules: List<AutomationRule>): AutomationRule? {
+    // Added Context and checkConditions flag
+    fun findMatchingRule(
+        context: Context, 
+        message: String, 
+        rules: List<AutomationRule>, 
+        checkConditions: Boolean = true
+    ): AutomationRule? {
         if (message.isBlank()) return null
 
         val activeRules = rules.filter { it.isActive }.sortedBy { it.priority }
 
         for (rule in activeRules) {
-            // The Catch-All Logic (*)
-            if (rule.triggerKeyword.trim() == "*") {
-                return rule
+            
+            // 1. Check Hardware Conditions First
+            if (checkConditions) {
+                if (rule.requireScreenOff && !ConditionChecker.isScreenOff(context)) continue
+                if (rule.requireCharging && !ConditionChecker.isCharging(context)) continue
+                if (rule.requireDnd && !ConditionChecker.isDndActive(context)) continue
             }
 
-            val isMatch = when (rule.matchType) {
-                "EXACT" -> normalizeText(message) == normalizeText(rule.triggerKeyword)
-                "SIMILARITY" -> calculateSimilarity(message, rule.triggerKeyword) >= 0.75
-                "PATTERN" -> checkWildcardPattern(message, rule.triggerKeyword)
-                "REGEX" -> {
-                    try {
-                        Regex(rule.triggerKeyword, RegexOption.IGNORE_CASE).containsMatchIn(message)
-                    } catch (e: Exception) {
-                        false
+            // 2. Check Text Matching
+            val isMatch = if (rule.triggerKeyword.trim() == "*") {
+                true // Catch-all
+            } else {
+                when (rule.matchType) {
+                    "EXACT" -> normalizeText(message) == normalizeText(rule.triggerKeyword)
+                    "SIMILARITY" -> calculateSimilarity(message, rule.triggerKeyword) >= 0.75
+                    "PATTERN" -> checkWildcardPattern(message, rule.triggerKeyword)
+                    "REGEX" -> {
+                        try {
+                            Regex(rule.triggerKeyword, RegexOption.IGNORE_CASE).containsMatchIn(message)
+                        } catch (e: Exception) {
+                            false
+                        }
                     }
+                    "WELCOME" -> true 
+                    else -> message.contains(rule.triggerKeyword, ignoreCase = true)
                 }
-                "WELCOME" -> true 
-                else -> message.contains(rule.triggerKeyword, ignoreCase = true)
             }
 
             if (isMatch) return rule
@@ -81,9 +96,7 @@ object RuleEngine {
             else -> replies.first()
         }
 
-        return selectedReply
-            .replace("{name}", if (name.isNotBlank()) name else "there")
-            .replace("{number}", number)
+        return selectedReply.replace("{name}", if (name.isNotBlank()) name else "there").replace("{number}", number)
     }
 
     fun extractName(input: String): String {
