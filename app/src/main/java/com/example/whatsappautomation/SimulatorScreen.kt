@@ -31,7 +31,9 @@ fun SimulatorScreen(viewModel: AppViewModel, onBack: () -> Unit) {
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     
-    // Check Master Switch state
+    // State to show "Typing..." indicator
+    var isBotTyping by remember { mutableStateOf(false) }
+    
     val isAutomationActive by viewModel.isAutomationActive.collectAsState()
     var showOffDialog by remember { mutableStateOf(false) }
 
@@ -47,28 +49,20 @@ fun SimulatorScreen(viewModel: AppViewModel, onBack: () -> Unit) {
         }
     }
 
-    LaunchedEffect(messages.size) {
+    // Auto-scroll when messages change OR when bot starts typing
+    LaunchedEffect(messages.size, isBotTyping) {
         if (messages.isNotEmpty()) {
-            listState.animateScrollToItem(messages.size - 1)
+            listState.animateScrollToItem(messages.size) // Scroll to bottom including typing indicator
         }
     }
 
-    // Master Switch Dialog
     if (showOffDialog) {
         AlertDialog(
-            onDismissRequest = { 
-                showOffDialog = false 
-                onBack() // Kick them out of the simulator
-            },
+            onDismissRequest = { showOffDialog = false; onBack() },
             title = { Text("Test your rules") },
             text = { Text("AutoResponder is off. Please activate it using the switch at the top.") },
             confirmButton = {
-                Button(onClick = { 
-                    showOffDialog = false 
-                    onBack() 
-                }) {
-                    Text("OK")
-                }
+                Button(onClick = { showOffDialog = false; onBack() }) { Text("OK") }
             }
         )
     }
@@ -84,7 +78,7 @@ fun SimulatorScreen(viewModel: AppViewModel, onBack: () -> Unit) {
                         Spacer(modifier = Modifier.width(12.dp))
                         Column {
                             Text("Chat Simulator", fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                            Text("Online", fontSize = 12.sp, color = Color(0xFF00A884))
+                            Text(if (isBotTyping) "typing..." else "Online", fontSize = 12.sp, color = Color(0xFF00A884))
                         }
                     }
                 },
@@ -122,10 +116,16 @@ fun SimulatorScreen(viewModel: AppViewModel, onBack: () -> Unit) {
                             val userText = inputMessage
                             messages.add(ChatMessage(userText, true))
                             inputMessage = ""
+                            
+                            // Show typing indicator
+                            isBotTyping = true
 
-                            // Launch coroutine to handle the delay
                             scope.launch {
+                                // The ViewModel will pause here based on the min/max delay
                                 val botReplyText = viewModel.simulateMessage(userText)
+                                
+                                // Hide typing indicator
+                                isBotTyping = false
                                 
                                 if (botReplyText.isNotBlank()) {
                                     messages.add(ChatMessage(botReplyText, false))
@@ -152,6 +152,13 @@ fun SimulatorScreen(viewModel: AppViewModel, onBack: () -> Unit) {
                 items(messages) { message ->
                     ChatBubble(message)
                 }
+                
+                // Show Typing Bubble if bot is thinking
+                if (isBotTyping) {
+                    item {
+                        TypingBubble()
+                    }
+                }
             }
         }
     }
@@ -166,6 +173,18 @@ fun ChatBubble(message: ChatMessage) {
     Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = alignment) {
         Box(modifier = Modifier.background(bubbleColor, shape).padding(12.dp).widthIn(max = 300.dp)) {
             Text(text = message.text, color = Color(0xFFE9EDEF), fontSize = 15.sp)
+        }
+    }
+}
+
+@Composable
+fun TypingBubble() {
+    val bubbleColor = Color(0xFF202C33)
+    val shape = RoundedCornerShape(16.dp, 16.dp, 16.dp, 0.dp)
+
+    Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.Start) {
+        Box(modifier = Modifier.background(bubbleColor, shape).padding(horizontal = 16.dp, vertical = 12.dp)) {
+            Text(text = "typing...", color = Color(0xFF8696A0), fontSize = 14.sp, fontWeight = FontWeight.Medium)
         }
     }
 }
