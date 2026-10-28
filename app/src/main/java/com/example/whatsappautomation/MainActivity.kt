@@ -63,7 +63,7 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
         Screen.Dashboard, 
         Screen.Rules,
         Screen.Contacts, 
-        Screen.Logs, // Added Logs
+        Screen.Logs,
         Screen.Settings
     )
     
@@ -80,7 +80,6 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
 
     val isAutomationActive by viewModel.isAutomationActive.collectAsState()
     
-    // --- PERMISSION STATE ---
     var hasNotifAccess by remember { mutableStateOf(checkNotificationAccess(context)) }
     var hasContactAccess by remember { mutableStateOf(checkContactAccess(context)) }
     
@@ -98,7 +97,6 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
         }
     }
 
-    // --- BATTERY STATE ---
     val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
     var showBatteryDialog by remember { mutableStateOf(false) }
 
@@ -220,22 +218,13 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
                 )
             }
             
-            composable(Screen.Dashboard.route) { 
-                DashboardScreen(viewModel) 
-            }
-            composable(Screen.Rules.route) { 
-                RulesScreen(
-                    viewModel = viewModel,
-                    onEditRule = { ruleId -> navController.navigate("rule_editor/$ruleId/0") }
-                ) 
-            }
+            composable(Screen.Dashboard.route) { DashboardScreen(viewModel) }
+            composable(Screen.Rules.route) { RulesScreen(viewModel, onEditRule = { ruleId -> navController.navigate("rule_editor/$ruleId/0") }) }
             composable(Screen.Contacts.route) { ContactsScreen(viewModel) }
             composable(Screen.Logs.route) { LogsScreen(viewModel) }
             composable(Screen.Settings.route) { SettingsScreen() }
             
-            composable("simulator") { 
-                SimulatorScreen(viewModel, onBack = { navController.popBackStack() }) 
-            }
+            composable("simulator") { SimulatorScreen(viewModel, onBack = { navController.popBackStack() }) }
 
             composable(
                 route = "rule_editor/{ruleId}/{parentId}",
@@ -273,43 +262,25 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
     // --- SMART PERMISSION DIALOG ---
     if (showPermissionDialog) {
         AlertDialog(
-            onDismissRequest = { 
-                showPermissionDialog = false 
-                isTurningOnAutomation = false
-            },
+            onDismissRequest = { showPermissionDialog = false; isTurningOnAutomation = false },
             title = { Text("Permissions Required") },
             text = { 
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text("To turn on the AutoResponder, you must grant the following permissions:")
-                    
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                        Icon(
-                            imageVector = if (hasNotifAccess) Icons.Default.CheckCircle else Icons.Default.Warning,
-                            contentDescription = null,
-                            tint = if (hasNotifAccess) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
-                        )
+                        Icon(imageVector = if (hasNotifAccess) Icons.Default.CheckCircle else Icons.Default.Warning, contentDescription = null, tint = if (hasNotifAccess) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("Notification Access", modifier = Modifier.weight(1f))
                         if (!hasNotifAccess) {
-                            TextButton(onClick = {
-                                val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
-                                context.startActivity(intent)
-                            }) { Text("Grant") }
+                            TextButton(onClick = { context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }) { Text("Grant") }
                         }
                     }
-
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                        Icon(
-                            imageVector = if (hasContactAccess) Icons.Default.CheckCircle else Icons.Default.Warning,
-                            contentDescription = null,
-                            tint = if (hasContactAccess) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
-                        )
+                        Icon(imageVector = if (hasContactAccess) Icons.Default.CheckCircle else Icons.Default.Warning, contentDescription = null, tint = if (hasContactAccess) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("Contact Access", modifier = Modifier.weight(1f))
                         if (!hasContactAccess) {
-                            TextButton(onClick = {
-                                contactPermissionLauncher.launch(Manifest.permission.WRITE_CONTACTS)
-                            }) { Text("Grant") }
+                            TextButton(onClick = { contactPermissionLauncher.launch(Manifest.permission.WRITE_CONTACTS) }) { Text("Grant") }
                         }
                     }
                 }
@@ -320,21 +291,11 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
                         viewModel.toggleAutomation(true)
                         showPermissionDialog = false
                         isTurningOnAutomation = false
-                        
                         val isOptimized = !powerManager.isIgnoringBatteryOptimizations(context.packageName)
-                        if (isOptimized && !PreferenceManager.isBatteryIgnored(context)) {
-                            showBatteryDialog = true
-                        }
-                    }) {
-                        Text("Done")
-                    }
+                        if (isOptimized && !PreferenceManager.isBatteryIgnored(context)) { showBatteryDialog = true }
+                    }) { Text("Done") }
                 } else {
-                    TextButton(onClick = { 
-                        showPermissionDialog = false 
-                        isTurningOnAutomation = false
-                    }) {
-                        Text("Close")
-                    }
+                    TextButton(onClick = { showPermissionDialog = false; isTurningOnAutomation = false }) { Text("Close") }
                 }
             }
         )
@@ -360,27 +321,17 @@ fun MainAppScreen(viewModel: AppViewModel = viewModel()) {
                             context.startActivity(fallbackIntent)
                         }
                     }
-                ) {
-                    Text("Go to Settings")
-                }
+                ) { Text("Go to Settings") }
             },
             dismissButton = {
-                TextButton(
-                    onClick = {
-                        PreferenceManager.setBatteryIgnored(context, true)
-                        showBatteryDialog = false
-                    }
-                ) {
-                    Text("Ignore", color = Color.Gray)
-                }
+                TextButton(onClick = { PreferenceManager.setBatteryIgnored(context, true); showBatteryDialog = false }) { Text("Ignore", color = Color.Gray) }
             }
         )
     }
 }
 
 fun checkNotificationAccess(context: Context): Boolean {
-    val enabledListeners = NotificationManagerCompat.getEnabledListenerPackages(context)
-    return enabledListeners.contains(context.packageName)
+    return NotificationManagerCompat.getEnabledListenerPackages(context).contains(context.packageName)
 }
 
 fun checkContactAccess(context: Context): Boolean {
