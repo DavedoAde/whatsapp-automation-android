@@ -93,7 +93,6 @@ fun ContactsScreen(viewModel: AppViewModel) {
         }
     }
 
-    // --- LISTEN FOR TOP BAR EXPORT TRIGGER ---
     val triggerExport by viewModel.triggerCsvExport.collectAsState()
     LaunchedEffect(triggerExport) {
         if (triggerExport) {
@@ -105,7 +104,6 @@ fun ContactsScreen(viewModel: AppViewModel) {
             viewModel.resetCsvExportTrigger()
         }
     }
-    // -----------------------------------------
 
     val filteredContacts = contacts.filter { 
         it.name.contains(searchQuery, ignoreCase = true) || it.phoneNumber.contains(searchQuery)
@@ -115,7 +113,6 @@ fun ContactsScreen(viewModel: AppViewModel) {
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
-            // Search bar only (Export moved to top bar)
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
@@ -339,7 +336,7 @@ fun RuleCard(rule: AutomationRule, onToggleClick: () -> Unit, onEditClick: () ->
     }
 }
 
-// --- LOGS (Without Top Bar - Handled by MainActivity) ---
+// --- LOGS ---
 @Composable
 fun LogsScreen(viewModel: AppViewModel) {
     val logs by viewModel.allLogs.collectAsState()
@@ -387,7 +384,7 @@ fun LogCard(log: ActivityLog) {
     }
 }
 
-// --- SETTINGS (Without Top Bar - Handled by MainActivity) ---
+// --- SETTINGS ---
 @Composable
 fun SettingsScreen() {
     val context = LocalContext.current
