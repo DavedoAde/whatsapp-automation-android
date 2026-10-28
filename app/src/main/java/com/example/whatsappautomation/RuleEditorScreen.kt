@@ -3,6 +3,10 @@ package com.example.whatsappautomation
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -51,15 +55,17 @@ fun RuleEditorScreen(
     var successMessage by rememberSaveable(existingRule?.id) { mutableStateOf(existingRule?.successMessage ?: "Thank you {name}! Your details have been saved.") }
     var assignTag by rememberSaveable(existingRule?.id) { mutableStateOf(existingRule?.assignTag ?: "") }
     
-    // Conditions State
     var screenOff by rememberSaveable(existingRule?.id) { mutableStateOf(existingRule?.requireScreenOff ?: false) }
     var charging by rememberSaveable(existingRule?.id) { mutableStateOf(existingRule?.requireCharging ?: false) }
     var dnd by rememberSaveable(existingRule?.id) { mutableStateOf(existingRule?.requireDnd ?: false) }
     var startTime by rememberSaveable(existingRule?.id) { mutableStateOf(existingRule?.startTime ?: "") }
     var endTime by rememberSaveable(existingRule?.id) { mutableStateOf(existingRule?.endTime ?: "") }
 
-    // Accordion State (Which card is open?)
     var expandedCard by rememberSaveable { mutableStateOf("TRIGGER") }
+
+    // Logic: If it's a new rule (existingRule == null) and trigger is empty, hide the other cards.
+    // If editing, or if they started typing, show all cards.
+    val showOtherCards = existingRule != null || trigger.isNotBlank()
 
     val replies = remember { mutableStateListOf<String>() }
     LaunchedEffect(existingRule) {
@@ -124,7 +130,9 @@ fun RuleEditorScreen(
                         showValidationError = true
                     }
                 },
-                containerColor = if (canSave) MaterialTheme.colorScheme.primary else Color.Gray
+                containerColor = if (canSave) MaterialTheme.colorScheme.primary else Color.Gray,
+                // THIS FIXES THE KEYBOARD OVERLAP!
+                modifier = Modifier.imePadding() 
             ) {
                 Icon(Icons.Default.Check, contentDescription = "Save Rule", tint = Color.White)
             }
@@ -138,7 +146,7 @@ fun RuleEditorScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // CARD 1: Received Message
+            // CARD 1: Received Message (Always visible)
             EditorCard(
                 title = "Received message", 
                 icon = Icons.Default.Message, 
@@ -192,185 +200,195 @@ fun RuleEditorScreen(
                 MatchOptionRow("Welcome message", "Replies to first message from a non-contact", "WELCOME", matchType) { matchType = it }
             }
 
-            // CARD 2: Automatic Reply
-            EditorCard(
-                title = "Automatic reply", 
-                icon = Icons.Default.Reply,
-                isExpanded = expandedCard == "REPLY",
-                onToggle = { expandedCard = if (expandedCard == "REPLY") "" else "REPLY" }
+            // DYNAMIC APPEARANCE: The rest of the cards only show when the trigger is typed
+            AnimatedVisibility(
+                visible = showOtherCards,
+                enter = fadeIn(tween(500)) + expandVertically(tween(500)),
+                exit = fadeOut(tween(300)) + shrinkVertically(tween(300))
             ) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    AssistChip(onClick = { insertVariable("name") }, label = { Text("{name}", fontSize = 10.sp) }, modifier = Modifier.padding(end = 4.dp))
-                    AssistChip(onClick = { insertVariable("number") }, label = { Text("{number}", fontSize = 10.sp) })
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                replies.forEachIndexed { index, reply ->
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
-                        OutlinedTextField(
-                            value = reply,
-                            onValueChange = { replies[index] = it },
-                            label = { Text("Should be sent (${index + 1})") },
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(12.dp),
-                            minLines = 2
-                        )
-                        if (replies.size > 1) {
-                            IconButton(onClick = { replies.removeAt(index) }) {
-                                Icon(Icons.Default.RemoveCircleOutline, contentDescription = "Remove", tint = MaterialTheme.colorScheme.error)
-                            }
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-                Text("Multiple replies", fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { replyMode = "SINGLE" }) {
-                        RadioButton(selected = replyMode == "SINGLE", onClick = { replyMode = "SINGLE" })
-                        Text("1")
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { replyMode = "ALL" }) {
-                        RadioButton(selected = replyMode == "ALL", onClick = { replyMode = "ALL" })
-                        Text("All")
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { replyMode = "RANDOM" }) {
-                        RadioButton(selected = replyMode == "RANDOM", onClick = { replyMode = "RANDOM" })
-                        Text("Random")
-                    }
-                    Spacer(modifier = Modifier.weight(1f))
-                    Button(
-                        onClick = { replies.add("") }, 
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-                        modifier = Modifier.height(36.dp)
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    
+                    // CARD 2: Automatic Reply
+                    EditorCard(
+                        title = "Automatic reply", 
+                        icon = Icons.Default.Reply,
+                        isExpanded = expandedCard == "REPLY",
+                        onToggle = { expandedCard = if (expandedCard == "REPLY") "" else "REPLY" }
                     ) {
-                        Icon(Icons.Default.Add, contentDescription = "Add Reply", modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Add", fontSize = 12.sp)
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-                Text("Delay in seconds", fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        value = delayMin,
-                        onValueChange = { delayMin = it },
-                        label = { Text("min") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp)
-                    )
-                    OutlinedTextField(
-                        value = delayMax,
-                        onValueChange = { delayMax = it },
-                        label = { Text("max") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp)
-                    )
-                }
-            }
-
-            // CARD 3: Save Lead
-            EditorCard(
-                title = "Save lead", 
-                icon = Icons.Default.PersonAdd, 
-                titleColor = MaterialTheme.colorScheme.tertiary,
-                isExpanded = expandedCard == "LEAD",
-                onToggle = { expandedCard = if (expandedCard == "LEAD") "" else "LEAD" }
-            ) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text("Ask their name and save the number", fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                    Switch(checked = askForName, onCheckedChange = { askForName = it }, colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.tertiary))
-                }
-                
-                if (askForName) {
-                    Spacer(modifier = Modifier.height(12.dp))
-                    OutlinedTextField(value = promptQuestion, onValueChange = { promptQuestion = it }, label = { Text("Question to ask name") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(value = confirmQuestion, onValueChange = { confirmQuestion = it }, label = { Text("Confirmation (YES/NO)") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(value = retryQuestion, onValueChange = { retryQuestion = it }, label = { Text("Retry if NO") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        OutlinedTextField(value = successMessage, onValueChange = { successMessage = it }, label = { Text("Success Message") }, modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp))
-                        IconButton(onClick = { insertVariable("name", isLeadField = true) }) {
-                            Icon(Icons.Default.Add, contentDescription = "Insert {name}", tint = MaterialTheme.colorScheme.tertiary)
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                            AssistChip(onClick = { insertVariable("name") }, label = { Text("{name}", fontSize = 10.sp) }, modifier = Modifier.padding(end = 4.dp))
+                            AssistChip(onClick = { insertVariable("number") }, label = { Text("{number}", fontSize = 10.sp) })
                         }
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(value = assignTag, onValueChange = { assignTag = it }, label = { Text("Assign Tag (e.g. TikTok, Facebook)") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))
-                }
-            }
-
-            // CARD 4: Conditions
-            EditorCard(
-                title = "Conditions (optional)", 
-                icon = Icons.Default.Tune,
-                isExpanded = expandedCard == "CONDITIONS",
-                onToggle = { expandedCard = if (expandedCard == "CONDITIONS") "" else "CONDITIONS" }
-            ) {
-                ConditionSwitchRow("Only reply if screen is off", screenOff) { screenOff = it }
-                ConditionSwitchRow("Only reply if device is charging", charging) { charging = it }
-                ConditionSwitchRow("Only reply if Do Not Disturb is on", dnd) { dnd = it }
-                
-                Spacer(modifier = Modifier.height(12.dp))
-                Text("Time Conditions (Business Hours)", fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                Text("Leave blank to reply 24/7", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        value = startTime,
-                        onValueChange = { if (it.length <= 5) startTime = it },
-                        label = { Text("Start Time") },
-                        placeholder = { Text("09:00") },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp)
-                    )
-                    OutlinedTextField(
-                        value = endTime,
-                        onValueChange = { if (it.length <= 5) endTime = it },
-                        label = { Text("End Time") },
-                        placeholder = { Text("17:00") },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp)
-                    )
-                }
-            }
-
-            // CARD 5: Submenu
-            if (existingRule != null) {
-                EditorCard(
-                    title = "Submenu / Conversation Flow", 
-                    icon = Icons.Default.AccountTree,
-                    isExpanded = expandedCard == "SUBMENU",
-                    onToggle = { expandedCard = if (expandedCard == "SUBMENU") "" else "SUBMENU" }
-                ) {
-                    Text("Rules added here will trigger after the contact is saved, or if they choose an option.", fontSize = 12.sp)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    childRules.forEach { child ->
-                        Card(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                        ) {
-                            Row(modifier = Modifier.padding(12.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                                Column {
-                                    Text(child.name, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                    Text("Trigger: ${child.triggerKeyword}", fontSize = 12.sp)
-                                }
-                                IconButton(onClick = { onEditChildRule(child.id) }) {
-                                    Icon(Icons.Default.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.primary)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        replies.forEachIndexed { index, reply ->
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+                                OutlinedTextField(
+                                    value = reply,
+                                    onValueChange = { replies[index] = it },
+                                    label = { Text("Should be sent (${index + 1})") },
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(12.dp),
+                                    minLines = 2
+                                )
+                                if (replies.size > 1) {
+                                    IconButton(onClick = { replies.removeAt(index) }) {
+                                        Icon(Icons.Default.RemoveCircleOutline, contentDescription = "Remove", tint = MaterialTheme.colorScheme.error)
+                                    }
                                 }
                             }
                         }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text("Multiple replies", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { replyMode = "SINGLE" }) {
+                                RadioButton(selected = replyMode == "SINGLE", onClick = { replyMode = "SINGLE" })
+                                Text("1")
+                            }
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { replyMode = "ALL" }) {
+                                RadioButton(selected = replyMode == "ALL", onClick = { replyMode = "ALL" })
+                                Text("All")
+                            }
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { replyMode = "RANDOM" }) {
+                                RadioButton(selected = replyMode == "RANDOM", onClick = { replyMode = "RANDOM" })
+                                Text("Random")
+                            }
+                            Spacer(modifier = Modifier.weight(1f))
+                            Button(
+                                onClick = { replies.add("") }, 
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                                modifier = Modifier.height(36.dp)
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = "Add Reply", modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Add", fontSize = 12.sp)
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text("Delay in seconds", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedTextField(
+                                value = delayMin,
+                                onValueChange = { delayMin = it },
+                                label = { Text("min") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                            OutlinedTextField(
+                                value = delayMax,
+                                onValueChange = { delayMax = it },
+                                label = { Text("max") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                        }
                     }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Button(onClick = { onAddChildRule(existingRule.id) }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
-                        Icon(Icons.Default.Add, contentDescription = "Add Submenu Rule")
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Add Submenu Rule")
+
+                    // CARD 3: Save Lead
+                    EditorCard(
+                        title = "Save lead", 
+                        icon = Icons.Default.PersonAdd, 
+                        titleColor = MaterialTheme.colorScheme.tertiary,
+                        isExpanded = expandedCard == "LEAD",
+                        onToggle = { expandedCard = if (expandedCard == "LEAD") "" else "LEAD" }
+                    ) {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            Text("Ask their name and save the number", fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                            Switch(checked = askForName, onCheckedChange = { askForName = it }, colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.tertiary))
+                        }
+                        
+                        if (askForName) {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            OutlinedTextField(value = promptQuestion, onValueChange = { promptQuestion = it }, label = { Text("Question to ask name") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedTextField(value = confirmQuestion, onValueChange = { confirmQuestion = it }, label = { Text("Confirmation (YES/NO)") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedTextField(value = retryQuestion, onValueChange = { retryQuestion = it }, label = { Text("Retry if NO") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                OutlinedTextField(value = successMessage, onValueChange = { successMessage = it }, label = { Text("Success Message") }, modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp))
+                                IconButton(onClick = { insertVariable("name", isLeadField = true) }) {
+                                    Icon(Icons.Default.Add, contentDescription = "Insert {name}", tint = MaterialTheme.colorScheme.tertiary)
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedTextField(value = assignTag, onValueChange = { assignTag = it }, label = { Text("Assign Tag (e.g. TikTok, Facebook)") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))
+                        }
+                    }
+
+                    // CARD 4: Conditions
+                    EditorCard(
+                        title = "Conditions (optional)", 
+                        icon = Icons.Default.Tune,
+                        isExpanded = expandedCard == "CONDITIONS",
+                        onToggle = { expandedCard = if (expandedCard == "CONDITIONS") "" else "CONDITIONS" }
+                    ) {
+                        ConditionSwitchRow("Only reply if screen is off", screenOff) { screenOff = it }
+                        ConditionSwitchRow("Only reply if device is charging", charging) { charging = it }
+                        ConditionSwitchRow("Only reply if Do Not Disturb is on", dnd) { dnd = it }
+                        
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text("Time Conditions (Business Hours)", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        Text("Leave blank to reply 24/7", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedTextField(
+                                value = startTime,
+                                onValueChange = { if (it.length <= 5) startTime = it },
+                                label = { Text("Start Time") },
+                                placeholder = { Text("09:00") },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                            OutlinedTextField(
+                                value = endTime,
+                                onValueChange = { if (it.length <= 5) endTime = it },
+                                label = { Text("End Time") },
+                                placeholder = { Text("17:00") },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                        }
+                    }
+
+                    // CARD 5: Submenu
+                    if (existingRule != null) {
+                        EditorCard(
+                            title = "Submenu / Conversation Flow", 
+                            icon = Icons.Default.AccountTree,
+                            isExpanded = expandedCard == "SUBMENU",
+                            onToggle = { expandedCard = if (expandedCard == "SUBMENU") "" else "SUBMENU" }
+                        ) {
+                            Text("Rules added here will trigger after the contact is saved, or if they choose an option.", fontSize = 12.sp)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            childRules.forEach { child ->
+                                Card(
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                                ) {
+                                    Row(modifier = Modifier.padding(12.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                        Column {
+                                            Text(child.name, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                            Text("Trigger: ${child.triggerKeyword}", fontSize = 12.sp)
+                                        }
+                                        IconButton(onClick = { onEditChildRule(child.id) }) {
+                                            Icon(Icons.Default.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.primary)
+                                        }
+                                    }
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Button(onClick = { onAddChildRule(existingRule.id) }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
+                                Icon(Icons.Default.Add, contentDescription = "Add Submenu Rule")
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Add Submenu Rule")
+                            }
+                        }
                     }
                 }
             }
@@ -387,7 +405,6 @@ fun RuleEditorScreen(
     }
 }
 
-// --- NEW COLLAPSIBLE CARD COMPOSABLE ---
 @Composable
 fun EditorCard(
     title: String, 
@@ -417,7 +434,6 @@ fun EditorCard(
                 )
             }
             
-            // Smooth animation for expanding/collapsing
             AnimatedVisibility(visible = isExpanded) {
                 Column {
                     Spacer(modifier = Modifier.height(12.dp))
